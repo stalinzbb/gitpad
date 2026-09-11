@@ -1,3 +1,4 @@
+import ServiceManagement
 import SwiftUI
 import AppKit
 import Carbon.HIToolbox // kVK_Escape for the hotkey recorder
@@ -757,6 +758,8 @@ struct SettingsView: View {
     @State private var vaultPass2 = ""
     @State private var vaultWorking = false
     @State private var vaultResult: String?
+    @State private var loginItem = SMAppService.mainApp.status == .enabled
+    @State private var loginNote: String?
     @State private var confirmErase = false
     @State private var eraseHasRemote = true
     @FocusState private var vaultPassFocused: Bool
@@ -831,6 +834,22 @@ struct SettingsView: View {
             }
         }
         .disabled(devBuild)
+    }
+
+    /// SMAppService, not a LaunchAgent plist: the system owns the entry, it shows up in
+    /// System Settings › Login Items, and unregistering removes it cleanly.
+    private func setLoginItem(_ on: Bool) {
+        do {
+            if on { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
+            loginNote = nil
+        } catch {
+            loginNote = "Couldn't change it: \(error.localizedDescription)"
+        }
+        // Read back rather than trust the toggle: macOS can hold a registration for approval.
+        loginItem = SMAppService.mainApp.status == .enabled
+        if on, SMAppService.mainApp.status == .requiresApproval {
+            loginNote = "Needs your approval in System Settings › General › Login Items."
+        }
     }
 
     /// Vault ops go through the sync queue so a timer sync can't write mid-copy.
@@ -943,6 +962,19 @@ struct SettingsView: View {
                 ShortcutsList()
 
                 case .advanced:
+                Section {
+                    Toggle("Open at login", isOn: Binding(get: { loginItem }, set: setLoginItem))
+                        .disabled(Updater.isDevBuild) // a dev build registered at login would outlive its checkout
+                    if let loginNote {
+                        Text(loginNote).font(.caption).foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("Startup")
+                } footer: {
+                    Text(Updater.isDevBuild ? "Not for dev builds — install the release to use this."
+                         : "GitPad starts with your Mac, in the menu bar, without opening its window.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 Section {
                     LabeledContent("Version") {
                         Text((Updater.currentVersion ?? "—") + (Updater.isDevBuild ? " · dev build" : ""))
