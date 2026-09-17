@@ -1,4 +1,5 @@
 import Foundation
+import GitPadCore
 
 enum GitSync {
     /// Runs a subprocess with a FIXED argument array — never a shell string.
@@ -199,15 +200,12 @@ enum GitSync {
             .split(separator: "\n").map(String.init)
         run(["merge", "--abort"], in: dir)
 
-        let date = DateFormatter()
-        date.dateFormat = "yyyy-MM-dd HHmm"
         for file in unmerged where file.hasSuffix(".md") {
             let show = run(["show", "\(remote):\(file)"], in: dir)
             guard show.status == 0 else { continue } // remote deleted it → nothing to copy
             let who = run(["log", "-1", "--format=%an", remote, "--", file], in: dir)
             let device = who.status == 0 && !who.out.isEmpty ? who.out : "other device"
-            let copy = file.replacingOccurrences(
-                of: ".md", with: " (conflict from \(device) \(date.string(from: Date()))).md")
+            let copy = Markdown.conflictCopyName(file, device: device, date: Date())
             try? show.out.write(to: dir.appendingPathComponent(copy),
                                 atomically: true, encoding: .utf8)
         }

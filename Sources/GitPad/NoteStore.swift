@@ -1,5 +1,8 @@
 import Foundation
 import AppKit
+import GitPadCore
+
+typealias NoteMeta = GitPadCore.NoteMeta
 
 enum Screen { case onboarding, capture, library, settings, gitSetup, conflicts }
 
@@ -14,13 +17,6 @@ enum SyncStatus: Equatable {
         case .offline: return "Can't reach remote — will retry"
         }
     }
-}
-
-/// What a Library row needs beyond the title: a preview line and the checklist tally.
-struct NoteMeta {
-    var snippet = ""
-    var done = 0
-    var total = 0
 }
 
 final class NoteStore: ObservableObject {
@@ -585,10 +581,8 @@ final class NoteStore: ObservableObject {
     func title(for url: URL) -> String {
         let mt = modified(url)
         if let cached = titleCache[url], cached.mtime == mt { return cached.title }
-        let first = (try? String(contentsOf: url, encoding: .utf8))?
-            .split(separator: "\n").first.map(String.init) ?? ""
-        let clean = first.trimmingCharacters(in: CharacterSet(charactersIn: "# ").union(.whitespaces))
-        let title = clean.isEmpty ? url.deletingPathExtension().lastPathComponent : clean
+        let title = Markdown.title(of: (try? String(contentsOf: url, encoding: .utf8)) ?? "",
+                                   fallback: url.deletingPathExtension().lastPathComponent)
         titleCache[url] = (title, mt)
         return title
     }
@@ -603,20 +597,7 @@ final class NoteStore: ObservableObject {
         return m
     }
 
-    /// Pure so `GitPad --selftest` can check it without touching the notes directory.
-    static func parseMeta(_ body: String) -> NoteMeta {
-        var m = NoteMeta()
-        for raw in body.split(separator: "\n").dropFirst() { // first non-empty line is the title
-            var line = raw.trimmingCharacters(in: .whitespaces)
-            if line.hasPrefix("- [x] ") { m.done += 1; m.total += 1 }
-            else if line.hasPrefix("- [ ] ") { m.total += 1 }
-            guard m.snippet.isEmpty else { continue }
-            line = line.trimmingCharacters(in: CharacterSet(charactersIn: "#-*+> "))
-            if line.hasPrefix("[x] ") || line.hasPrefix("[ ] ") { line.removeFirst(4) }
-            if !line.isEmpty { m.snippet = line }
-        }
-        return m
-    }
+    static func parseMeta(_ body: String) -> NoteMeta { Markdown.parseMeta(body) }
 
     /// Drop every cached read of `url` — call wherever a file moves or is rewritten.
     private func uncache(_ url: URL) {
@@ -627,10 +608,7 @@ final class NoteStore: ObservableObject {
         titleCache.removeAll(); contentCache.removeAll(); metaCache.removeAll(); mtimeCache.removeAll()
     }
 
-    /// Case- and diacritic-insensitive, so "cafe" finds "Café" and "Cafe".
-    static func fold(_ s: String) -> String {
-        s.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
-    }
+    static func fold(_ s: String) -> String { Markdown.fold(s) }
 
     /// Smart-lite search: split the query on whitespace and keep a note only if EVERY token
     /// hits its title or its body — so "groc milk" finds the note titled "Groceries" that
@@ -713,16 +691,8 @@ final class NoteStore: ObservableObject {
 
     // MARK: load/save — files keep standard markdown; the editor shows ☐/☑ glyphs
 
-    static func fromMarkdown(_ s: String) -> String {
-        // tolerant on read (`* [X]` from other editors); toMarkdown writes canonical `- [ ]`/`- [x]`
-        s.replacingOccurrences(of: #"(?m)^(\s*)[-*+] \[ \] "#, with: "$1☐ ", options: .regularExpression)
-         .replacingOccurrences(of: #"(?m)^(\s*)[-*+] \[[xX]\] "#, with: "$1☑ ", options: .regularExpression)
-    }
-
-    static func toMarkdown(_ s: String) -> String {
-        s.replacingOccurrences(of: #"(?m)^(\s*)☐ "#, with: "$1- [ ] ", options: .regularExpression)
-         .replacingOccurrences(of: #"(?m)^(\s*)☑ "#, with: "$1- [x] ", options: .regularExpression)
-    }
+    static func fromMarkdown(_ s: String) -> String { Markdown.fromMarkdown(s) }
+    static func toMarkdown(_ s: String) -> String { Markdown.toMarkdown(s) }
 
     private func loadSelected() {
         loading = true
@@ -760,11 +730,8 @@ final class NoteStore: ObservableObject {
         // one keystroke after a clean merge erased the other Mac's edit for good.
         if Self.stat(url) != loadedMtime,
            let disk = try? String(contentsOf: url, encoding: .utf8), disk != out {
-            let date = DateFormatter()
-            date.dateFormat = "yyyy-MM-dd HHmm"
             let copy = url.deletingLastPathComponent().appendingPathComponent(
-                url.deletingPathExtension().lastPathComponent
-                + " (conflict from another device \(date.string(from: Date()))).md")
+                Markdown.conflictCopyName(url.lastPathComponent, device: "another device", date: Date()))
             try? disk.write(to: copy, atomically: true, encoding: .utf8)
             wroteCopy = true
         }
