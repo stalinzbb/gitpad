@@ -8,6 +8,7 @@ struct LibraryView: View {
     @State private var showSettings = false
     @State private var newTitle: String?
     @State private var allDaily = false
+    @Environment(\.theme) private var theme
 
     private let dailyPreview = 4
 
@@ -17,7 +18,7 @@ struct LibraryView: View {
                 if query.isEmpty {
                     Section { todayCard }
                         .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 8, trailing: 16))
-                        .listRowSeparator(.hidden)
+                        .listRowSeparator(.hidden).listRowBackground(theme.surface)
                     // notes first, the daily log last — days pile up, notes are what you look for
                     ForEach(store.sections.filter { $0.name != "Daily" }, id: \.name) { s in
                         Section { ForEach(s.paths, id: \.self, content: row) } header: { header(s.name, s.paths.count) }
@@ -29,7 +30,7 @@ struct LibraryView: View {
                             if past.count > dailyPreview {
                                 Button(allDaily ? "Show fewer" : "Show all \(past.count) days") {
                                     withAnimation { allDaily.toggle() }
-                                }.font(.subheadline).foregroundStyle(.tint)
+                                }.font(.subheadline).foregroundStyle(.tint).listRowBackground(theme.surface)
                             }
                         } header: { header("Daily", past.count) }
                     }
@@ -40,6 +41,7 @@ struct LibraryView: View {
                 }
             }
             .listStyle(.plain)
+            .themedSurface(theme)
             .searchable(text: $query, prompt: "Search notes")
             .refreshable { await store.refresh() }
             .navigationTitle("GitPad")
@@ -59,7 +61,9 @@ struct LibraryView: View {
                 Button("Create") { Task { await create() } }
                 Button("Cancel", role: .cancel) { newTitle = nil }
             }
-            .sheet(isPresented: $showSettings) { SettingsView(store: store) }
+            .sheet(isPresented: $showSettings) {
+                SettingsView(store: store).environment(\.theme, theme).tint(theme.accent).preferredColorScheme(theme.scheme)
+            }
             .task { await store.refresh() }
         }
     }
@@ -85,7 +89,7 @@ struct LibraryView: View {
             }
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(theme.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain)
     }
@@ -110,7 +114,7 @@ struct LibraryView: View {
         // pinned plain-list headers are transparent; rows would show through while scrolling
         .padding(.horizontal, 16).padding(.top, 14).padding(.bottom, 6)
         .frame(maxWidth: .infinity)
-        .background(Color(.systemBackground))
+        .background(theme.surface)
         .listRowInsets(EdgeInsets())
     }
 
@@ -137,6 +141,7 @@ struct LibraryView: View {
             }
             .padding(.vertical, 4)
         }
+        .listRowBackground(theme.surface)
     }
 
     private func create() async {
@@ -170,10 +175,12 @@ struct SettingsView: View {
     @State private var device = MobileStore.device
     @State private var confirmForget = false
     @State private var error: String?
+    @Environment(\.theme) private var theme
 
     var body: some View {
         NavigationStack {
-            Form {
+            Form { Group {
+                Section("Theme") { ThemePicker() }
                 Section("Repository") {
                     LabeledContent("Remote", value: store.api.map { "\($0.owner)/\($0.repo)" } ?? "—")
                     LabeledContent("Branch", value: MobileStore.branch)
@@ -191,7 +198,8 @@ struct SettingsView: View {
                 Section {
                     Button("Forget this phone", role: .destructive) { confirmForget = true }
                 } footer: { Text("Removes the token and every cached note from this phone. The repo is untouched.") }
-            }
+            }.listRowBackground(theme.card) } // cells on the theme surface, not system grey
+            .themedSurface(theme)
             .navigationTitle("Settings").navigationBarTitleDisplayMode(.inline)
             .toolbar { Button("Done") { dismiss() } }
             .confirmationDialog("Forget this phone?", isPresented: $confirmForget, titleVisibility: .visible) {

@@ -15,7 +15,8 @@ All notable changes to GitPad. Dates are release dates; format loosely follows
   Daily / Inbox / folders, read mode with tappable checkboxes, a plain editor, quick-entry on
   today's note, and an "Append to Daily" Shortcut. GitHub remotes only; a fine-grained token
   in the phone's Keychain. The Mac keeps merging; a phone edit that races a Mac edit becomes
-  a "(conflict from iPhone …)" copy, like any other device. The pure Markdown helpers moved
+  a "(conflict from iPhone …)" copy, like any other device. Dark mode and the Mac's five themes,
+  drawn from one shared table. The pure Markdown helpers moved
   to a shared `GitPadCore` library target — Mac behaviour unchanged.
 - **`gitpad://note?title=…`** opens a note by title — it's what a `[[link]]` click uses, and
   scripts can use it too.

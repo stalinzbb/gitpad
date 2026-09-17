@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import GitPadCore
 
 // MARK: - Themes (token set consumed by the editor + chrome)
 //
@@ -43,13 +44,11 @@ struct Theme: Identifiable {
         self.accent = .controlAccentColor; self.code = .systemPurple; self.tintHex = nil
     }
 
-    static let all: [Theme] = [
-        Theme(system: "System"),
-        Theme(id: "Sepia",            base: .light, accent: 0xA87538, code: 0x996B33, tint: 0xF5E8CF),
-        Theme(id: "Nord",             base: .dark,  accent: 0x87BFD1, code: 0xA3BF8C, tint: 0x2E3340),
-        Theme(id: "Dracula",          base: .dark,  accent: 0xBD94FA, code: 0x4FE67A, tint: 0x292936),
-        Theme(id: "Solarized Light",  base: .light, accent: 0x268CD1, code: 0x859900, tint: 0xFCF5E3),
-    ]
+    /// One row per preset lives in `GitPadCore.Palette`, shared with the iPhone app.
+    static let all: [Theme] = Palette.all.map { p in
+        guard let dark = p.dark, let a = p.accent, let c = p.code, let t = p.tint else { return Theme(system: p.id) }
+        return Theme(id: p.id, base: dark ? .dark : .light, accent: a, code: c, tint: t)
+    }
 
     static func named(_ id: String) -> Theme { all.first { $0.id == id } ?? all[0] }
 }

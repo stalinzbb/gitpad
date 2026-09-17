@@ -10,12 +10,13 @@ struct SetupView: View {
     @State private var device = MobileStore.device.isEmpty ? UIDevice.current.name : MobileStore.device
     @State private var busy = false
     @State private var error: String?
+    @Environment(\.theme) private var theme
 
     private var parsed: (owner: String, repo: String)? { Markdown.parseRemote(remote) }
 
     var body: some View {
         NavigationStack {
-            Form {
+            Form { Group {
                 Section {
                     VStack(alignment: .leading, spacing: 6) {
                         Image(systemName: "note.text").font(.system(size: 34, weight: .medium)).foregroundStyle(.tint)
@@ -55,7 +56,8 @@ struct SetupView: View {
                 } footer: {
                     if let error { Text(error).foregroundStyle(.red) }
                 }
-            }
+            }.listRowBackground(theme.card) } // cells on the theme surface, not system grey
+            .themedSurface(theme)
             .navigationTitle("GitPad").navigationBarTitleDisplayMode(.inline)
         }
     }

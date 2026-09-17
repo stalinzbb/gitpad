@@ -40,7 +40,7 @@ truth — [README.md](README.md) (vision/features), [PROJECT.md](PROJECT.md)
 | `EditorView.swift` | All SwiftUI: theme tokens, NavBar chrome, screens, NSTextView markdown editor |
 | `OnboardingView.swift` | First-run walkthrough + reusable git-setup guide |
 | `Vault.swift` | Optional encrypted vault: hdiutil sparse bundle mounted at the notes path, Keychain passphrase, erase-from-Mac |
-| `../GitPadCore/Markdown.swift` | Library target, Foundation only, all `public`: `NoteMeta`/`parseMeta`, `fold`, `to/fromMarkdown`, `title(of:)`, `conflictCopyName`, `parseRemote`. `NoteStore` forwards to it. Anything that decides what a note looks like on disk goes here so the phone agrees |
+| `../GitPadCore/Markdown.swift` | Library target, Foundation only, all `public`: `NoteMeta`/`parseMeta`, `fold`, `to/fromMarkdown`, `title(of:)`, `conflictCopyName`, `parseRemote`. `NoteStore` forwards to it. `Palette.swift` beside it is the theme table (ids + hexes) both apps build their `Theme` from — add a theme there, once. Anything that decides what a note looks like on disk goes here so the phone agrees |
 | `Mobile/GitPadMobile/*.swift` | iPhone companion (SwiftUI, iOS 16): `GitHubAPI` (Contents/Trees REST over URLSession, GitHub-only), `MobileStore` (cache in Documents/cache, sections, daily), `Keychain`, `SetupView`/`LibraryView`/`NoteView`, `Intents` (Append to Daily). No git, no merge — the Mac reconciles what the phone commits |
 
 ## Invariants — do not break

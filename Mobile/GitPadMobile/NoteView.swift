@@ -17,6 +17,7 @@ struct NoteView: View {
     @State private var conflict = false
     @State private var quick = ""
     @FocusState private var editorFocused: Bool
+    @Environment(\.theme) private var theme
 
     private var isToday: Bool { path == MobileStore.dailyPath() }
 
@@ -35,7 +36,8 @@ struct NoteView: View {
                 .refreshable { await load() }
             }
         }
-        .background(Color(.systemBackground))
+        .background(theme.surface.ignoresSafeArea())
+        .toolbarBackground(theme.surface, for: .navigationBar)
         .navigationTitle("").navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .principal) { status }
@@ -120,7 +122,12 @@ struct NoteView: View {
     /// Inline links/bold/italic/code via Foundation's markdown parser; plain on failure.
     private func rich(_ s: Substring) -> Text {
         let str = String(s)
-        return Text((try? AttributedString(markdown: str, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(str))
+        guard var a = try? AttributedString(markdown: str, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))
+        else { return Text(str) }
+        for run in a.runs where run.inlinePresentationIntent?.contains(.code) == true {
+            a[run.range].foregroundColor = theme.code // inline code in the theme's code colour, like the Mac
+        }
+        return Text(a)
     }
 
     // MARK: bottom: banners + today's quick-entry
@@ -138,7 +145,7 @@ struct NoteView: View {
                 HStack(spacing: 8) {
                     TextField("Add a line…", text: $quick, axis: .vertical).lineLimit(1...4)
                         .padding(.horizontal, 14).padding(.vertical, 9)
-                        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        .background(theme.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                         .onSubmit(append)
                     Button(action: append) { Image(systemName: "arrow.up.circle.fill").font(.system(size: 32)) }
                         .disabled(quick.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -149,7 +156,7 @@ struct NoteView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .frame(maxWidth: .infinity)
-        .background(.bar)
+        .background(theme.surface)
     }
 
     private func banner(_ text: String, _ symbol: String, _ color: Color) -> some View {
