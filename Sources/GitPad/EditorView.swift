@@ -563,10 +563,7 @@ struct CaptureView: View {
         } label: {
             Image(systemName: "ellipsis").iconSlot()
         }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .tint(.secondary) // borderlessButton tints its label with accent; match + and search
-        .foregroundStyle(.secondary)
+        .chromeMenu()
         .frame(width: ChromeIcon.side)
         .help("More")
     }
@@ -648,7 +645,7 @@ struct CaptureView: View {
                     Label("\(links.count) linked", systemImage: "arrow.turn.up.left")
                         .font(.caption2).labelStyle(.titleAndIcon)
                 }
-                .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+                .chromeMenu().fixedSize()
                 .help("Notes that link to this one")
             }
         }
@@ -1795,9 +1792,7 @@ struct FolderRailRow: View {
                             .frame(width: railSlot, height: railSlot)
                             .contentShape(Rectangle())
                     }
-                    .menuStyle(.borderlessButton).menuIndicator(.hidden)
-                    .tint(.secondary) // borderlessButton tints its label with accent; force it to match the chrome
-                    .foregroundStyle(.secondary)
+                    .chromeMenu()
                 } else {
                     Text("\(count)").font(.callout).foregroundStyle(.secondary)
                 }
@@ -1858,12 +1853,11 @@ struct NoteRow: View {
                 Divider()
                 Button("Delete", role: .destructive) { store.delete(url) }
             } label: {
-                Image(systemName: "ellipsis.circle").foregroundStyle(.secondary)
+                Image(systemName: "ellipsis.circle")
                     .iconSlot() // constant slot; no .fixedSize() remeasure
                     .contentShape(Rectangle())
             }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
+            .chromeMenu()
             .opacity(hovering ? 1 : 0)
             .allowsHitTesting(hovering) // hidden ⋯ must not eat taps meant for the row
         }
@@ -3131,9 +3125,8 @@ struct ActionBar: View {
             } label: {
                 Text(block).font(.caption)
             }
-            .menuStyle(.borderlessButton)
+            .chromeMenu(.primary, indicator: .automatic) // matches the bar's primary glyphs
             .fixedSize()
-            .foregroundStyle(.primary)
             .padding(.trailing, Space.xs)
             .help("Paragraph type")
         }

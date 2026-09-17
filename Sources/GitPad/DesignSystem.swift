@@ -250,6 +250,13 @@ enum ChromeGlyph {
 extension View {
     /// The chrome glyph slot: fixed square + the house glyph size/weight. `ChromeIcon` uses
     /// it internally; apply it directly to Menu labels, which can't be Buttons.
+    /// Every chrome `Menu` goes through here. `.borderlessButton` paints its label in the
+    /// accent colour and ignores `foregroundStyle` alone, so a ⋯ menu came out purple next to
+    /// grey + and search buttons. Tinting to the same colour is what makes it match.
+    func chromeMenu(_ color: Color = .secondary, indicator: Visibility = .hidden) -> some View {
+        menuStyle(.borderlessButton).menuIndicator(indicator).tint(color).foregroundStyle(color)
+    }
+
     func iconSlot(side: CGFloat = ChromeIcon.side) -> some View {
         font(Fonts.chromeGlyph).frame(width: side, height: side)
     }
