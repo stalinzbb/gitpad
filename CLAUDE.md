@@ -15,6 +15,10 @@ truth — [README.md](README.md) (vision/features), [PROJECT.md](PROJECT.md)
   change near `GitSync.sync` or `NoteStore` save/refresh. `GITPAD_DEVICE_NAME` overrides
   the commit author per invocation.
 - **Quick compile:** `swift build -c release`.
+- **iOS companion:** `xcodebuild -project Mobile/GitPadMobile.xcodeproj -scheme GitPadMobile
+  -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build`. The
+  project is a hand-written pbxproj with a synchronized folder group (`Mobile/GitPadMobile/`,
+  every `.swift` there is compiled) and a local package dependency on `..` for `GitPadCore`.
 - **Release:** merge a prep PR (bump `Info.plist`, date the CHANGELOG section), then
   `./release.sh` on the signing Mac: build, sign, notarize, zip + DMG, and `./publish.sh`
   (GitHub pre-release with the CHANGELOG section + checksums, tap cask bump, digest check).
@@ -24,7 +28,7 @@ truth — [README.md](README.md) (vision/features), [PROJECT.md](PROJECT.md)
   at a scratch notes folder: `GITPAD_DIR=/tmp/gitpad-dev ./GitPad.app/Contents/MacOS/GitPad`.
   Without `GITPAD_DIR` a dev build edits `~/Documents/GitPad` and syncs to the real remote.
 
-## Source map (8 files, `Sources/GitPad/`)
+## Source map (`Sources/GitPad/` + `Sources/GitPadCore/` + `Mobile/`)
 
 | File | Role |
 |------|------|
@@ -36,6 +40,8 @@ truth — [README.md](README.md) (vision/features), [PROJECT.md](PROJECT.md)
 | `EditorView.swift` | All SwiftUI: theme tokens, NavBar chrome, screens, NSTextView markdown editor |
 | `OnboardingView.swift` | First-run walkthrough + reusable git-setup guide |
 | `Vault.swift` | Optional encrypted vault: hdiutil sparse bundle mounted at the notes path, Keychain passphrase, erase-from-Mac |
+| `../GitPadCore/Markdown.swift` | Library target, Foundation only, all `public`: `NoteMeta`/`parseMeta`, `fold`, `to/fromMarkdown`, `title(of:)`, `conflictCopyName`, `parseRemote`. `NoteStore` forwards to it. `Palette.swift` beside it is the theme table (ids + hexes) both apps build their `Theme` from — add a theme there, once. Anything that decides what a note looks like on disk goes here so the phone agrees |
+| `Mobile/GitPadMobile/*.swift` | iPhone companion (SwiftUI, iOS 16): `GitHubAPI` (Contents/Trees REST over URLSession, GitHub-only), `MobileStore` (cache in Documents/cache, sections, daily), `Keychain`, `SetupView`/`LibraryView`/`NoteView`, `Intents` (Append to Daily). No git, no merge — the Mac reconciles what the phone commits |
 
 ## Invariants — do not break
 

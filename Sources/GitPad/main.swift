@@ -1,4 +1,5 @@
 import AppKit
+import GitPadCore
 import SwiftUI
 
 /// `precondition` in a release build traps without printing its message, so a CI failure
@@ -356,6 +357,17 @@ if CommandLine.arguments.contains("--selftest") {
     check(ListLogic.letterLabel(27) == "aa")
     check(ListLogic.romanLabel(4) == "iv" && ListLogic.romanLabel(9) == "ix")
     check(ListLogic.displayMarker(number: nil, depth: 1) == "◦")
+    // GitPadCore: shared with the iOS companion, so the on-disk shapes must not drift
+    check(Markdown.parseRemote("git@github.com:o/r.git").map { "\($0.owner)/\($0.repo)" } == "o/r")
+    check(Markdown.parseRemote("https://github.com/o/r").map { "\($0.owner)/\($0.repo)" } == "o/r")
+    check(Markdown.parseRemote("https://github.com/o/r.git/").map { "\($0.owner)/\($0.repo)" } == "o/r")
+    check(Markdown.parseRemote("ssh://git@github.com/o/r").map { "\($0.owner)/\($0.repo)" } == "o/r")
+    check(Markdown.parseRemote("git@gitlab.com:o/r.git") == nil)
+    check(Markdown.parseRemote("https://github.com/o") == nil)
+    let cdate = DateFormatter(); cdate.dateFormat = "yyyy-MM-dd HHmm"
+    check(Markdown.conflictCopyName("Inbox/a.md", device: "iPhone", date: cdate.date(from: "2026-07-23 1200")!)
+        == "Inbox/a (conflict from iPhone 2026-07-23 1200).md")
+    check(Markdown.title(of: "## Hello  \nbody", fallback: "f") == "Hello" && Markdown.title(of: "\n", fallback: "f") == "f")
 
     // lean scrollbar: our scroller survives being installed, and stays eligible for
     // overlay drawing (false here means AppKit silently draws its own knob instead)
