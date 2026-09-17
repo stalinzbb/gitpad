@@ -3402,13 +3402,21 @@ final class SmartTextView: NSTextView {
         super.paste(sender)
     }
 
-    /// A width change means the panel was resized or collapsed to the pill — the selection
-    /// bar and slash card were positioned for the old geometry and would float loose.
-    /// Height changes are ignored: the view grows with every typed line.
-    override func setFrameSize(_ newSize: NSSize) {
-        let widthChanged = newSize.width != frame.width
-        super.setFrameSize(newSize)
-        if widthChanged { (delegate as? MarkdownTextView.Coordinator)?.closeFloatingCards() }
+    /// The selection bar and slash card are child panels positioned for one geometry.
+    /// Collapsing to the pill *replaces* the editor in the view tree — this view leaves
+    /// the window entirely, so a frame hook never fires and the cards stayed up next to
+    /// the pill. Hook the window itself: leaving it, or it resizing, closes them.
+    private var resizeObserver: NSObjectProtocol?
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if let o = resizeObserver { NotificationCenter.default.removeObserver(o); resizeObserver = nil }
+        let coordinator = delegate as? MarkdownTextView.Coordinator
+        guard let window else { coordinator?.closeFloatingCards(); return }
+        resizeObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didResizeNotification, object: window, queue: .main) { [weak self] _ in
+            (self?.delegate as? MarkdownTextView.Coordinator)?.closeFloatingCards()
+        }
     }
 
     /// The drag is over, so the selection is final — see `Coordinator.selectionSettled`.

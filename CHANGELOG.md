@@ -14,6 +14,13 @@ All notable changes to GitPad. Dates are release dates; format loosely follows
 - **`gitpad://note?title=…`** opens a note by title — it's what a `[[link]]` click uses, and
   scripts can use it too.
 
+### Fixed
+
+- **The selection bar and slash menu really close when the panel collapses to the pill.**
+  The previous fix watched the editor's width, but collapsing removes the editor from the
+  window entirely, so it never fired; they now close when the editor leaves the window or
+  the window resizes.
+
 ## [0.15.0] — 2026-09-11
 
 A new icon, links that open, placeholders that say what goes where, and a day of editor
