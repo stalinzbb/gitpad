@@ -5,6 +5,11 @@ All notable changes to GitPad. Dates are release dates; format loosely follows
 
 ## [Unreleased]
 
+## [0.16.0] — 2026-09-17
+
+Notes that link to each other, GitPad at login, and floating editor cards that finally
+stay put where they belong.
+
 ### Added
 
 - **Open at login.** Settings → Advanced → Startup. GitPad starts with your Mac in the menu
@@ -23,6 +28,14 @@ All notable changes to GitPad. Dates are release dates; format loosely follows
   The previous fix watched the editor's width, but collapsing removes the editor from the
   window entirely, so it never fired; they now close when the editor leaves the window or
   the window resizes.
+- **The selection bar no longer comes back on its own.** Hiding the panel, minimizing it or
+  switching apps closes it, instead of it reappearing when GitPad reopened. Esc with text
+  selected clears the selection (and the bar); the next Esc steps back as before.
+- **Placeholders fit an emptied note.** Deleting everything no longer clips the hint, and
+  "Untitled" only shows on a real title line, so it lines up with the caret.
+- **⌘A highlights the whole note**, not a sliver at the left edge.
+- **Menu icons match the rest of the chrome.** The ⋯ menus in the header and note rows
+  were drawn in the accent colour next to grey + and search.
 
 ## [0.15.0] — 2026-09-11
 
