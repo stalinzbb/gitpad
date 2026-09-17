@@ -565,6 +565,7 @@ struct CaptureView: View {
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
+        .tint(.secondary) // borderlessButton tints its label with accent; match + and search
         .foregroundStyle(.secondary)
         .frame(width: ChromeIcon.side)
         .help("More")
@@ -3168,6 +3169,10 @@ final class DividerLayoutManager: NSLayoutManager {
         for i in rects.indices {
             let r = rects[i]
             let gi = glyphIndex(for: NSPoint(x: r.minX - origin.x + 1, y: r.midY - origin.y), in: container)
+            let frag = lineFragmentRect(forGlyphAt: gi, effectiveRange: nil)
+            // Select All hands over the middle lines as ONE tall rect; capping it to the
+            // single line under its midY shrank the whole block to a sliver at the edge.
+            guard r.height <= frag.height + 1 else { continue }
             let used = lineFragmentUsedRect(forGlyphAt: gi, effectiveRange: nil).offsetBy(dx: origin.x, dy: origin.y)
             if r.maxX > used.maxX + 1 { rects[i].size.width = max(0, used.maxX + 6 - r.minX) }
         }
@@ -3362,7 +3367,10 @@ final class SmartTextView: NSTextView {
             let (o1, _, _) = EditorMetrics.headingOffsets
             let font = MarkdownTextView.Coordinator.bold(
                 MarkdownTextView.Coordinator.baseFont(coord.fontSize + o1, coord.design))
-            let r = viewRect(at: (titleLine as NSString).length)
+            var r = viewRect(at: (titleLine as NSString).length)
+            // An emptied note's caret rect is body-font tall (no "# " left to style it), which
+            // clipped the heading-size hint — size it for the font it's drawn in.
+            r.size.height = max(r.height, Self.placeholderStyle(font).minimumLineHeight)
             ("Untitled" as NSString).draw(in: NSRect(x: r.minX, y: r.minY, width: bounds.width - r.minX, height: r.height),
                                           withAttributes: [.font: font, .foregroundColor: color,
                                                            .paragraphStyle: Self.placeholderStyle(font)])
@@ -3371,7 +3379,11 @@ final class SmartTextView: NSTextView {
         if bodyEmpty {
             let font = MarkdownTextView.Coordinator.baseFont(coord.fontSize, coord.design)
             let r: NSRect
-            if hasNewline { r = viewRect(at: titleRange.location + titleRange.length) }
+            if hasNewline {
+                let caret = viewRect(at: titleRange.location + titleRange.length)
+                r = NSRect(x: caret.minX, y: caret.minY, width: caret.width,
+                           height: max(caret.height, Self.placeholderStyle(font).minimumLineHeight))
+            }
             else if let top = bodyTop {
                 r = NSRect(x: textContainerOrigin.x + (textContainer?.lineFragmentPadding ?? 0), y: top,
                            width: bounds.width, height: font.pointSize * 2)

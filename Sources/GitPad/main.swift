@@ -271,6 +271,8 @@ if CommandLine.arguments.contains("--uitest") {
             ("code-chip", "# Notes\nrun `swift build` then `./test.sh` — see [docs](https://x.y)\n", nil),
             ("code-wrap", "# Notes\nbehaviour `When do you start trusting AI blindly? When I first started using LLMs for tinkering` them and more\n", nil),
             ("multi-select", "# NYC\n☐ Central Park\n☐ Vessel\n", NSRange(location: 8, length: 22)),
+            ("emptied", "", nil),
+            ("select-all", "# Thursday\n\nsdafsafasfsa\n\nsfasdfasf\n\n/", NSRange(location: 0, length: 38)),
         ]
         for (name, text, sel) in cases {
             let (tv, _) = makeUndoableEditor(text)
