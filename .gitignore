@@ -3,5 +3,3 @@ GitPad.app/
 .DS_Store
 *.dmg
 *.zip
-xcuserdata/
-Mobile/GitPadMobile.xcodeproj/project.xcworkspace/

@@ -11,12 +11,6 @@ All notable changes to GitPad. Dates are release dates; format loosely follows
   titles, narrowing as you type. `[[Title]]` renders as a link; clicking it opens that note,
   or creates it if there's none. The status line shows "N linked" on any note that others
   link to, with a menu to jump back. Plain Markdown on disk, as always.
-- **GitPad Mobile** (`Mobile/`): an iPhone companion over the GitHub API — Library with
-  Daily / Inbox / folders, read mode with tappable checkboxes, a plain editor, quick-entry on
-  today's note, and an "Append to Daily" Shortcut. GitHub remotes only; a fine-grained token
-  in the phone's Keychain. The Mac keeps merging; a phone edit that races a Mac edit becomes
-  a "(conflict from iPhone …)" copy, like any other device. The pure Markdown helpers moved
-  to a shared `GitPadCore` library target — Mac behaviour unchanged.
 - **`gitpad://note?title=…`** opens a note by title — it's what a `[[link]]` click uses, and
   scripts can use it too.
 

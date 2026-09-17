@@ -79,31 +79,9 @@ key, missing repo, HTTPS login) and offers the fix — including a one-click swi
 HTTPS via the `gh` CLI. Adding a second Mac and resolving conflicts are covered in
 [SYNCING.md](SYNCING.md).
 
-## On your phone
-
-Your notes are plain Markdown in a git repo, so anything that speaks git can read them:
-
-- **Read:** the GitHub app (or any host's web UI) renders the `.md` files as they are.
-- **Read and edit:** [GitJournal](https://gitjournal.io) or [Working Copy](https://workingcopy.app)
-  clone the repo. The Mac treats a phone exactly like a second Mac — clean merges just
-  land, real conflicts become a "(conflict from …)" copy on the Conflicts screen.
-
-**GitPad Mobile** (`Mobile/`) is a small native iPhone companion that goes one step further:
-the Library with Daily / Inbox / folders, notes in a read mode where checkboxes toggle in
-place, a plain editor, a quick-entry line on today's note, and an "Append to Daily"
-Shortcut for the Action Button. There's no git on iOS, so it talks to the **GitHub API**
-over `URLSession` — still zero dependencies. That means v1 works with GitHub remotes only.
-You paste a fine-grained token (Repository access: that one repo; Permission: Contents →
-Read and write); it lives in the phone's Keychain and never leaves it. That's a sign-in to
-the remote you already push to, not to a GitPad server — there is none. Build it from
-source with Xcode: open `Mobile/GitPadMobile.xcodeproj` and run it on your phone.
-
-Note: the encrypted vault protects the Mac's disk. The remote holds plain files, and so
-does any phone that reads them.
-
 ## Architecture
 
-Seven files plus a shared library, no third-party dependencies:
+Seven files, no third-party dependencies:
 
 | File | Role |
 |------|------|
@@ -114,8 +92,6 @@ Seven files plus a shared library, no third-party dependencies:
 | `GitSync.swift` | All git operations via `Process` on `/usr/bin/git` |
 | `EditorView.swift` | SwiftUI chrome + NSTextView editor with markdown styling |
 | `OnboardingView.swift` | First-run walkthrough + the reusable git-setup guide |
-| `Vault.swift` | Optional encrypted vault (sparse bundle mounted at the notes path) |
-| `GitPadCore/Markdown.swift` | Foundation-only helpers shared with the iPhone app: checkbox conversion, row metadata, conflict-copy names |
 
 Storage is the filesystem; the sync "backend" is whatever git remote you point it
 at. See [SECURITY.md](SECURITY.md) for the threat model and [ROADMAP.md](ROADMAP.md)
