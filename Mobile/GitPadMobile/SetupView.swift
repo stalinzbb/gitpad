@@ -17,6 +17,16 @@ struct SetupView: View {
         NavigationStack {
             Form {
                 Section {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Image(systemName: "note.text").font(.system(size: 34, weight: .medium)).foregroundStyle(.tint)
+                        Text("Your notes, from your repo.").font(.title2.bold())
+                        Text("GitPad Mobile reads and writes the same Markdown files your Mac syncs. No GitPad server — just GitHub.")
+                            .font(.subheadline).foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 6)
+                    .listRowBackground(Color.clear).listRowInsets(EdgeInsets(top: 0, leading: 4, bottom: 0, trailing: 4))
+                }
+                Section {
                     TextField("git@github.com:you/notes.git", text: $remote)
                         .textInputAutocapitalization(.never).autocorrectionDisabled()
                         .keyboardType(.URL)
@@ -38,13 +48,15 @@ struct SetupView: View {
                     TextField("iPhone", text: $device)
                 }
                 Section {
-                    Button(busy ? "Connecting…" : "Connect") { Task { await connect() } }
+                    Button { Task { await connect() } } label: {
+                        HStack { Spacer(); if busy { ProgressView().padding(.trailing, 6) }; Text(busy ? "Connecting…" : "Connect").fontWeight(.semibold); Spacer() }
+                    }
                         .disabled(busy || parsed == nil || token.isEmpty || device.trimmingCharacters(in: .whitespaces).isEmpty)
                 } footer: {
                     if let error { Text(error).foregroundStyle(.red) }
                 }
             }
-            .navigationTitle("GitPad")
+            .navigationTitle("GitPad").navigationBarTitleDisplayMode(.inline)
         }
     }
 

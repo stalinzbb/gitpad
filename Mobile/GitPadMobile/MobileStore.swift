@@ -63,6 +63,7 @@ final class MobileStore: ObservableObject {
         for k in ["remote", "branch", "device", "lastSync"] { UserDefaults.standard.removeObject(forKey: k) }
         try? FileManager.default.removeItem(at: cacheDir)
         try? FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
+        prefetching?.cancel()
         entries = []; bodies = [:]; lastSync = nil; api = nil
     }
 
@@ -84,8 +85,27 @@ final class MobileStore: ObservableObject {
             UserDefaults.standard.set(lastSync, forKey: "lastSync")
             try? JSONEncoder().encode(fresh).write(to: cacheDir.appendingPathComponent("tree.json"))
             error = nil
+            prefetch()
         } catch {
             self.error = error.localizedDescription
+        }
+    }
+
+    /// Rows can only show a real title, snippet and task tally once the body is cached, and
+    /// the tree API carries none of that — so fill the cache in the background after a refresh.
+    /// ponytail: one request per uncached note, sequential, newest-daily and Inbox first; a
+    /// changed sha is the only thing that re-fetches. Switch to the GraphQL API (many blobs per
+    /// request) if libraries reach thousands of notes.
+    private var prefetching: Task<Void, Never>?
+    private func prefetch() {
+        prefetching?.cancel()
+        let wanted = sections.flatMap(\.paths).filter { bodies[$0] == nil }
+        guard let api, !wanted.isEmpty else { return }
+        prefetching = Task {
+            for p in wanted {
+                if Task.isCancelled { return }
+                if let f = try? await api.read(p) { store(p, f) }
+            }
         }
     }
 
@@ -105,10 +125,28 @@ final class MobileStore: ObservableObject {
         return out
     }
 
+    /// Daily notes are named by date, so the row says "Today" / "Tue 8 Sep" without a fetch.
+    static func dayLabel(_ path: String) -> String? {
+        guard path.hasPrefix("Daily/") else { return nil }
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
+        guard let d = f.date(from: String(path.dropFirst(6).dropLast(3))) else { return nil }
+        let cal = Calendar.current
+        if cal.isDateInToday(d) { return "Today" }
+        if cal.isDateInYesterday(d) { return "Yesterday" }
+        f.dateFormat = cal.isDate(d, equalTo: Date(), toGranularity: .year) ? "EEE d MMM" : "EEE d MMM yyyy"
+        return f.string(from: d)
+    }
+
     func title(_ path: String) -> String {
+        if let day = Self.dayLabel(path) { return day }
         let name = String(path.split(separator: "/").last ?? "").replacingOccurrences(of: ".md", with: "")
-        guard let f = bodies[path] else { return name }
-        return Markdown.title(of: f.body, fallback: name)
+        // scratch notes are named note-<timestamp>; that's noise, not a title
+        let fallback = name.hasPrefix("note-") ? "Untitled" : name
+        guard let f = bodies[path] else { return fallback }
+        // a note that opens with a checkbox or bullet: show the words, not the marker
+        let t = Markdown.title(of: f.body, fallback: fallback)
+            .replacingOccurrences(of: #"^[-*+] (\[[ xX]\] ?)?"#, with: "", options: .regularExpression)
+        return t.isEmpty ? fallback : t
     }
 
     func meta(_ path: String) -> NoteMeta? { bodies[path].map { Markdown.parseMeta($0.body) } }
