@@ -3356,13 +3356,15 @@ final class SmartTextView: NSTextView {
         }
         let color = NSColor.placeholderTextColor
         var bodyTop: CGFloat?
-        if titleLine == "# " || titleLine.isEmpty {
+        // Only a real "# " line gets the title hint. With the marker deleted (backspace at
+        // the title start, or ⌘A + delete) the line types as body text, and a title-size
+        // "Untitled" beside a body-size caret was the mismatch.
+        if titleLine == "# " {
             let (o1, _, _) = EditorMetrics.headingOffsets
             let font = MarkdownTextView.Coordinator.bold(
                 MarkdownTextView.Coordinator.baseFont(coord.fontSize + o1, coord.design))
             var r = viewRect(at: (titleLine as NSString).length)
-            // An emptied note's caret rect is body-font tall (no "# " left to style it), which
-            // clipped the heading-size hint — size it for the font it's drawn in.
+            // the caret rect can be shorter than a heading line — size the hint for its own font
             r.size.height = max(r.height, Self.placeholderStyle(font).minimumLineHeight)
             ("Untitled" as NSString).draw(in: NSRect(x: r.minX, y: r.minY, width: bounds.width - r.minX, height: r.height),
                                           withAttributes: [.font: font, .foregroundColor: color,
@@ -3372,8 +3374,8 @@ final class SmartTextView: NSTextView {
         if bodyEmpty {
             let font = MarkdownTextView.Coordinator.baseFont(coord.fontSize, coord.design)
             let r: NSRect
-            if hasNewline {
-                let caret = viewRect(at: titleRange.location + titleRange.length)
+            if hasNewline || titleLine.isEmpty { // an empty first line is body: the hint sits on it
+                let caret = viewRect(at: titleLine.isEmpty ? 0 : titleRange.location + titleRange.length)
                 r = NSRect(x: caret.minX, y: caret.minY, width: caret.width,
                            height: max(caret.height, Self.placeholderStyle(font).minimumLineHeight))
             }
