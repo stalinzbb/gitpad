@@ -2413,6 +2413,12 @@ struct MarkdownTextView: NSViewRepresentable {
             if selector == #selector(NSResponder.insertTab(_:)) { return indentList(tv, out: false) }
             if selector == #selector(NSResponder.insertBacktab(_:)) { return indentList(tv, out: true) }
             if selector == #selector(NSResponder.deleteBackward(_:)) { return smartDeleteBackward(tv) }
+            // Esc with text selected drops the selection (and so the selection bar); the
+            // next Esc steps back as usual via `PanelWindow.cancelOperation`.
+            if selector == #selector(NSResponder.cancelOperation(_:)), tv.selectedRange().length > 0 {
+                tv.setSelectedRange(NSRange(location: NSMaxRange(tv.selectedRange()), length: 0))
+                return true
+            }
             return false
         }
 
