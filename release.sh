@@ -15,6 +15,13 @@ if [ -z "${IDENTITY:-}" ]; then
     exit 1
 fi
 
+# Build only what main has. A dirty tree or a local main that's behind/ahead of origin
+# would ship code no PR reviewed, under a tag that points somewhere else.
+git fetch -q origin main
+[ -z "$(git status --porcelain)" ] || { echo "error: working tree has uncommitted changes" >&2; exit 1; }
+[ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] \
+    || { echo "error: HEAD is not origin/main — merge the release prep PR and pull first" >&2; exit 1; }
+
 VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" Info.plist)
 ZIP="GitPad-$VERSION.zip"
 

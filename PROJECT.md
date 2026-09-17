@@ -73,13 +73,20 @@ gotchas, and things that would surprise a contributor._
 ## Release
 
 `./release.sh` does the whole thing on the signing Mac and ends by calling `./publish.sh`,
-which creates the GitHub pre-release (notes = the CHANGELOG section for the version plus a
+which creates the GitHub release (notes = the CHANGELOG section for the version plus a
 "Verify your download" checksum block), bumps `Casks/gitpad.rb` in `stalinzbb/homebrew-tap`,
 and checks GitHub's zip digest against the local file — the in-app updater refuses a zip
 without one. Every step skips itself when already done, so a failed publish is re-run with
 `./publish.sh` alone. `DRY_RUN=1 ./publish.sh` prints the mutating commands instead.
 The prep PR (version bump + dated CHANGELOG section) must be merged first: `publish.sh`
 refuses without a `## [x.y.z]` section, and `release.sh` reads the version from Info.plist.
+Both scripts refuse a dirty tree or a HEAD that isn't `origin/main`, and the release is
+tagged at the built commit (`--target`), so a tag always describes the bytes in the zip.
+Releases are full releases, not pre-releases: `/releases/latest` (the README link, the
+"Latest" badge) skips pre-releases — that's how 0.14.0 and 0.15.0 shipped while the README
+kept serving 0.13.0. `publish.sh` also runs the built bundle's `--selftest` before publishing.
+Rollback: `gh release delete vX.Y.Z --yes --cleanup-tag`, then bump the cask back by hand
+(version + sha256 of the previous zip); the in-app updater never downgrades on its own.
 
 ## Verify
 
