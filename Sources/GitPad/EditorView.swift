@@ -563,9 +563,7 @@ struct CaptureView: View {
         } label: {
             Image(systemName: "ellipsis").iconSlot()
         }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .foregroundStyle(.secondary)
+        .chromeMenu()
         .frame(width: ChromeIcon.side)
         .help("More")
     }
@@ -647,7 +645,7 @@ struct CaptureView: View {
                     Label("\(links.count) linked", systemImage: "arrow.turn.up.left")
                         .font(.caption2).labelStyle(.titleAndIcon)
                 }
-                .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+                .chromeMenu().fixedSize()
                 .help("Notes that link to this one")
             }
         }
@@ -1794,9 +1792,7 @@ struct FolderRailRow: View {
                             .frame(width: railSlot, height: railSlot)
                             .contentShape(Rectangle())
                     }
-                    .menuStyle(.borderlessButton).menuIndicator(.hidden)
-                    .tint(.secondary) // borderlessButton tints its label with accent; force it to match the chrome
-                    .foregroundStyle(.secondary)
+                    .chromeMenu()
                 } else {
                     Text("\(count)").font(.callout).foregroundStyle(.secondary)
                 }
@@ -1857,12 +1853,11 @@ struct NoteRow: View {
                 Divider()
                 Button("Delete", role: .destructive) { store.delete(url) }
             } label: {
-                Image(systemName: "ellipsis.circle").foregroundStyle(.secondary)
+                Image(systemName: "ellipsis.circle")
                     .iconSlot() // constant slot; no .fixedSize() remeasure
                     .contentShape(Rectangle())
             }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
+            .chromeMenu()
             .opacity(hovering ? 1 : 0)
             .allowsHitTesting(hovering) // hidden ⋯ must not eat taps meant for the row
         }
@@ -3130,9 +3125,8 @@ struct ActionBar: View {
             } label: {
                 Text(block).font(.caption)
             }
-            .menuStyle(.borderlessButton)
+            .chromeMenu(.primary, indicator: .automatic) // matches the bar's primary glyphs
             .fixedSize()
-            .foregroundStyle(.primary)
             .padding(.trailing, Space.xs)
             .help("Paragraph type")
         }
@@ -3168,6 +3162,10 @@ final class DividerLayoutManager: NSLayoutManager {
         for i in rects.indices {
             let r = rects[i]
             let gi = glyphIndex(for: NSPoint(x: r.minX - origin.x + 1, y: r.midY - origin.y), in: container)
+            let frag = lineFragmentRect(forGlyphAt: gi, effectiveRange: nil)
+            // Select All hands over the middle lines as ONE tall rect; capping it to the
+            // single line under its midY shrank the whole block to a sliver at the edge.
+            guard r.height <= frag.height + 1 else { continue }
             let used = lineFragmentUsedRect(forGlyphAt: gi, effectiveRange: nil).offsetBy(dx: origin.x, dy: origin.y)
             if r.maxX > used.maxX + 1 { rects[i].size.width = max(0, used.maxX + 6 - r.minX) }
         }
@@ -3358,11 +3356,16 @@ final class SmartTextView: NSTextView {
         }
         let color = NSColor.placeholderTextColor
         var bodyTop: CGFloat?
-        if titleLine == "# " || titleLine.isEmpty {
+        // Only a real "# " line gets the title hint. With the marker deleted (backspace at
+        // the title start, or ⌘A + delete) the line types as body text, and a title-size
+        // "Untitled" beside a body-size caret was the mismatch.
+        if titleLine == "# " {
             let (o1, _, _) = EditorMetrics.headingOffsets
             let font = MarkdownTextView.Coordinator.bold(
                 MarkdownTextView.Coordinator.baseFont(coord.fontSize + o1, coord.design))
-            let r = viewRect(at: (titleLine as NSString).length)
+            var r = viewRect(at: (titleLine as NSString).length)
+            // the caret rect can be shorter than a heading line — size the hint for its own font
+            r.size.height = max(r.height, Self.placeholderStyle(font).minimumLineHeight)
             ("Untitled" as NSString).draw(in: NSRect(x: r.minX, y: r.minY, width: bounds.width - r.minX, height: r.height),
                                           withAttributes: [.font: font, .foregroundColor: color,
                                                            .paragraphStyle: Self.placeholderStyle(font)])
@@ -3371,7 +3374,11 @@ final class SmartTextView: NSTextView {
         if bodyEmpty {
             let font = MarkdownTextView.Coordinator.baseFont(coord.fontSize, coord.design)
             let r: NSRect
-            if hasNewline { r = viewRect(at: titleRange.location + titleRange.length) }
+            if hasNewline || titleLine.isEmpty { // an empty first line is body: the hint sits on it
+                let caret = viewRect(at: titleLine.isEmpty ? 0 : titleRange.location + titleRange.length)
+                r = NSRect(x: caret.minX, y: caret.minY, width: caret.width,
+                           height: max(caret.height, Self.placeholderStyle(font).minimumLineHeight))
+            }
             else if let top = bodyTop {
                 r = NSRect(x: textContainerOrigin.x + (textContainer?.lineFragmentPadding ?? 0), y: top,
                            width: bounds.width, height: font.pointSize * 2)
