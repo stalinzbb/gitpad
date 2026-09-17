@@ -7,6 +7,9 @@ All notable changes to GitPad. Dates are release dates; format loosely follows
 
 ### Added
 
+- **Open at login.** Settings → Advanced → Startup. GitPad starts with your Mac in the menu
+  bar without opening its window; it appears in System Settings › Login Items like any
+  other login item and can be turned off from either place.
 - **Note links.** Type `[[` and pick a note — the card that serves slash commands lists your
   titles, narrowing as you type. `[[Title]]` renders as a link; clicking it opens that note,
   or creates it if there's none. The status line shows "N linked" on any note that others

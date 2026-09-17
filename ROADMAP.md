@@ -28,7 +28,7 @@ or it doesn't ship.
       stays out: the vault protects the disk, the remote is your choice.
 - [ ] CLI companion (`gitpad new "…"`).
 - [ ] Spotlight importer.
-- [ ] Launch at login.
+- [x] **Launch at login** — Settings → Advanced → Startup (`SMAppService`, shows in System Settings › Login Items).
 - [x] **Built-in updates** — daily check, one-click install, and an optional
       auto-update that stages in the background and installs on quit. No Sparkle: a
       dependency-free updater is ~300 lines against GitHub Releases, and the zero
