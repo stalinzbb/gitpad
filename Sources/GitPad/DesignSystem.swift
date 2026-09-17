@@ -492,6 +492,7 @@ struct GlassBackground: NSViewRepresentable {
 final class FloatingCard {
     private var panel: NSPanel?
     private let host = NSHostingController(rootView: AnyView(EmptyView()))
+    private var resignObserver: NSObjectProtocol?
 
     var isVisible: Bool { panel?.isVisible ?? false }
 
@@ -518,9 +519,17 @@ final class FloatingCard {
         panel.setFrameOrigin(NSPoint(x: x.rounded(), y: y.rounded()))
         if panel.parent == nil { win.addChildWindow(panel, ordered: .above) }
         panel.orderFront(nil)
+        // A child window is hidden and re-shown *with* its parent, so a card left up when
+        // the panel was hidden, minimized or clicked away from came back on reopen.
+        // Losing key is the one signal all of those share.
+        if resignObserver == nil {
+            resignObserver = NotificationCenter.default.addObserver(
+                forName: NSWindow.didResignKeyNotification, object: win, queue: .main) { [weak self] _ in self?.close() }
+        }
     }
 
     func close() {
+        if let o = resignObserver { NotificationCenter.default.removeObserver(o); resignObserver = nil }
         guard let panel else { return }
         panel.parent?.removeChildWindow(panel)
         panel.orderOut(nil)
