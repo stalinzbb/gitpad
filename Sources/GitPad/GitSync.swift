@@ -139,7 +139,9 @@ enum GitSync {
                           relativeTo: dir)
         try? FileManager.default.createDirectory(at: exclude.deletingLastPathComponent(),
                                                  withIntermediateDirectories: true)
-        try? "*\n!*/\n!*.md\n".write(to: exclude, atomically: true, encoding: .utf8)
+        // Clipboard/ is this Mac's copy log (NoteStore.clipboardNote): passwords pass through
+        // the clipboard and git history is forever, so it never leaves the machine.
+        try? "*\n!*/\n!*.md\n/Clipboard/\n".write(to: exclude, atomically: true, encoding: .utf8)
 
         // 1. commit local changes
         run(["add", "-A"], in: dir)

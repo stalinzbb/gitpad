@@ -171,11 +171,13 @@ mkdir -p "$K/Work"
 printf '# Real\n- note\n' > "$K/Work/real.md"
 printf 'TOKEN=hunter2\n' > "$K/.env"
 printf 'binary' > "$K/Work/shot.png"
+mkdir -p "$K/Clipboard"; printf '# Clipboard\nhunter2\n' > "$K/Clipboard/2026-01-01.md"
 : > "$K/.DS_Store"
 git -C "$K" init -q -b main; git -C "$K" remote add origin "$R9"
 "$BIN" --sync "$K" || { echo "FAIL: sync with stray files failed"; exit 1; }
 [ "$(git -C "$K" ls-files)" = "Work/real.md" ] || { echo "FAIL: non-markdown got committed: $(git -C "$K" ls-files)"; exit 1; }
 git -C "$R9" show main:.env >/dev/null 2>&1 && { echo "FAIL: .env reached the remote"; exit 1; }
+git -C "$R9" show main:Clipboard/2026-01-01.md >/dev/null 2>&1 && { echo "FAIL: Clipboard/ reached the remote"; exit 1; }
 [ -f "$K/.env" ] || { echo "FAIL: stray file was deleted, not just ignored"; exit 1; }
 echo "PASS: only markdown reaches the remote"
 

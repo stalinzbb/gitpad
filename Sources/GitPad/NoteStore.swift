@@ -424,20 +424,46 @@ final class NoteStore: ObservableObject {
     /// Append text to today's note — used by the clipboard menu item and
     /// `gitpad://daily?append=`. If the daily note is open, append into the live
     /// editor buffer so in-flight edits aren't clobbered.
-    func appendToDaily(_ raw: String) {
+    func appendToDaily(_ raw: String) { append(raw) { dailyNote() } }
+
+    /// One file per day in Clipboard/ — text copied anywhere while GitPad runs
+    /// (ClipboardWatcher). Local to this Mac: GitSync excludes the folder.
+    func clipboardNote() -> URL {
+        let folder = dir.appendingPathComponent("Clipboard")
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let name = DateFormatter()
+        name.dateFormat = "yyyy-MM-dd"
+        let day = name.string(from: Date())
+        let url = folder.appendingPathComponent(day + ".md")
+        if !FileManager.default.fileExists(atPath: url.path) {
+            try? "# Clipboard \(day)\n".write(to: url, atomically: true, encoding: .utf8)
+        }
+        return url
+    }
+
+    func appendToClipboard(_ raw: String) {
+        let time = DateFormatter()
+        time.dateFormat = "HH:mm"
+        // sync: false — the folder is git-excluded, so a sync per copy would be a wasted fetch
+        append("### \(time.string(from: Date()))\n\n" + raw.trimmingCharacters(in: .whitespacesAndNewlines),
+               gap: "\n", sync: false) { clipboardNote() }
+    }
+
+    /// `note` is a closure so a locked vault never gets as far as creating the file.
+    private func append(_ raw: String, gap: String = "", sync: Bool = true, to note: () -> URL) {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !locked else { return } // locked: the write would silently vanish
-        let url = dailyNote()
+        let url = note()
         if selected?.path == url.path {
             if !text.isEmpty && !text.hasSuffix("\n") { text += "\n" }
-            text += trimmed + "\n"
+            text += gap + trimmed + "\n"
             saveNow()
         } else {
             let existing = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
             let sep = existing.isEmpty || existing.hasSuffix("\n") ? "" : "\n"
-            try? (existing + sep + trimmed + "\n").write(to: url, atomically: true, encoding: .utf8)
+            try? (existing + sep + gap + trimmed + "\n").write(to: url, atomically: true, encoding: .utf8)
             uncache(url)
-            onSaved?()
+            if sync { onSaved?() }
             refresh()
         }
     }
