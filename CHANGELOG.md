@@ -5,6 +5,11 @@ All notable changes to GitPad. Dates are release dates; format loosely follows
 
 ## [Unreleased]
 
+## [0.17.0] — 2026-09-18
+
+Readable themes and chrome on every preset, tighter motion, and the groundwork for signing
+in with GitHub.
+
 ### Added
 
 - **Sign in with GitHub.** The sync guide and Fix Sync can sign you in with a short code you
