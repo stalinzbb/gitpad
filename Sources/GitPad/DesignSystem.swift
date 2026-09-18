@@ -31,6 +31,30 @@ struct Theme: Identifiable {
     /// Selected row fill. Derived from the theme, NOT `Color.accentColor` — `.tint()` never
     /// changes accentColor, so a themed panel used to show system-blue selection.
     var selection: Color { accentSwift.opacity(Alpha.selection) }
+    /// Secondary/tertiary text levels, injected once in `EditorView`. nil tint = System.
+    /// Pure black/white ink, not `Color.primary`: macOS's label colour is already 85% alpha,
+    /// so "62% of primary" rendered at 4.2:1 on Sepia — measured by `--uitest`, which is why it exists.
+    var secondaryInk: Color { tintHex == nil ? Color(nsColor: .secondaryLabelColor) : ink.opacity(0.62) }
+    var tertiaryInk: Color { tintHex == nil ? Color(nsColor: .tertiaryLabelColor) : ink.opacity(0.5) }
+    private var ink: Color { appearance == .darkAqua ? .white : .black }
+
+    /// WCAG contrast of accent and code against the surface, for `--selftest`: both are text
+    /// colours and must clear AA (4.5:1), so a new theme can't ship unreadable. nil = System.
+    var textContrast: (accent: Double, code: Double)? {
+        guard let tintHex, let surface = NSColor(hex: tintHex).usingColorSpace(.sRGB) else { return nil }
+        func lum(_ c: NSColor) -> Double {
+            let c = c.usingColorSpace(.sRGB) ?? c
+            let l = [c.redComponent, c.greenComponent, c.blueComponent].map(Double.init).map { (v: Double) -> Double in
+                v <= 0.03928 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4)
+            }
+            return 0.2126 * l[0] + 0.7152 * l[1] + 0.0722 * l[2] as Double
+        }
+        func ratio(_ a: NSColor) -> Double {
+            let (x, y) = (lum(a), lum(surface))
+            return (max(x, y) + 0.05) / (min(x, y) + 0.05)
+        }
+        return (ratio(accent), ratio(code))
+    }
 
     /// The common case: a preset from hex colors + a light/dark base.
     init(id: String, base: ThemeBase, accent: UInt, code: UInt, tint: UInt) {
@@ -45,13 +69,27 @@ struct Theme: Identifiable {
 
     static let all: [Theme] = [
         Theme(system: "System"),
-        Theme(id: "Sepia",            base: .light, accent: 0xA87538, code: 0x996B33, tint: 0xF5E8CF),
+        Theme(id: "Sepia",            base: .light, accent: 0x7D5729, code: 0x7A4A2B, tint: 0xF5E8CF),
         Theme(id: "Nord",             base: .dark,  accent: 0x87BFD1, code: 0xA3BF8C, tint: 0x2E3340),
         Theme(id: "Dracula",          base: .dark,  accent: 0xBD94FA, code: 0x4FE67A, tint: 0x292936),
-        Theme(id: "Solarized Light",  base: .light, accent: 0x268CD1, code: 0x859900, tint: 0xFCF5E3),
+        Theme(id: "Solarized Light",  base: .light, accent: 0x1D6BA0, code: 0x5E6C00, tint: 0xFCF5E3),
     ]
 
     static func named(_ id: String) -> Theme { all.first { $0.id == id } ?? all[0] }
+}
+
+extension View {
+    /// The themed root: accent, the theme value, and the ink levels every `.secondary` /
+    /// `.tertiary` below resolves against. The system greys are tuned for white/black and
+    /// fall to ~3:1 on Sepia and Solarized paper; 62% ink clears AA (4.5:1) on every preset,
+    /// 50% clears 3:1 for marks. System keeps the OS's. `--uitest` measures the rendered result.
+    func themed(_ theme: Theme) -> some View {
+        foregroundStyle(.primary, theme.secondaryInk, theme.tertiaryInk)
+            .tint(theme.accentSwift) // buttons/toggles/sliders/selection take the theme accent
+            // `.tint` can't carry the theme: it never reaches `Color.accentColor`, which is
+            // why themed panels used to select in system blue.
+            .environment(\.theme, theme)
+    }
 }
 
 /// The one reactive design value. Injected once, in `EditorView`; everything below reads it
@@ -129,9 +167,14 @@ extension Color {
     static let quietFill = Color.primary.opacity(Alpha.hover)   // search fields, steppers
     static let cardStroke = Color.primary.opacity(Alpha.stroke)
     // Status colors, so the sync dot / setup checks can't disagree across screens.
-    static let statusOK = Color.green
-    static let statusErr = Color.red
-    static let statusWarn = Color.orange
+    // Status colours double as text ("✓ Synced", the orange status line). System green/red/orange
+    // are ~2–3:1 on light paper, so light appearances get darker inks; dark keeps the system's.
+    static let statusOK = adaptive(light: 0x1E7B34, dark: .systemGreen)
+    static let statusErr = adaptive(light: 0xA8261C, dark: .systemRed)
+    static let statusWarn = adaptive(light: 0x8F5200, dark: .systemOrange)
+    private static func adaptive(light: UInt, dark: NSColor) -> Color {
+        Color(nsColor: NSColor(name: nil) { $0.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? dark : NSColor(hex: light) })
+    }
 }
 
 enum Fonts {
@@ -163,10 +206,28 @@ enum PanelMetrics {
 /// nil animation means "instant" — so Reduce Motion falls out for free everywhere.
 enum Motion {
     static var reduce: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
-    // screen: critically-damped reposition; quick: snappy hover; pop: momentum bounce.
-    static var screen: Animation? { reduce ? nil : .spring(response: 0.32, dampingFraction: 0.85) }
+    // screen: one screen replacing another — the house ease-out (same curve as the pill), under
+    //   300ms, no overshoot: it's seen tens of times a day. Reduce Motion keeps a short fade
+    //   (see `slide`), because a hard cut between screens reads as broken, not calm.
+    // quick: cards arriving/leaving. hover: colour only, ≤150ms. press: the 0.96 squeeze.
+    // pop: momentum bounce — onboarding only, where it's seen once.
+    static var screen: Animation? { reduce ? .easeOut(duration: 0.15) : houseEaseOut(0.24) }
     static var quick:  Animation? { reduce ? nil : .spring(response: 0.18, dampingFraction: 0.9) }
+    static var hover:  Animation? { reduce ? nil : .easeOut(duration: 0.12) }
+    static var press:  Animation? { reduce ? nil : .easeOut(duration: 0.16) }
     static var pop:    Animation? { reduce ? nil : .spring(response: 0.30, dampingFraction: 0.7) }
+    static let pressScale: CGFloat = 0.96
+
+    private static func houseEaseOut(_ d: TimeInterval) -> Animation {
+        .timingCurve(Double(pillCurve.0), Double(pillCurve.1), Double(pillCurve.2), Double(pillCurve.3), duration: d)
+    }
+
+    /// A screen sliding in from `edge`. Under Reduce Motion the movement goes, the fade stays.
+    static func slide(_ edge: Edge) -> AnyTransition {
+        reduce ? .opacity : .move(edge: edge).combined(with: .opacity)
+    }
+    /// A screen or card settling in place. Never from nothing: 0.98 + fade.
+    static var settle: AnyTransition { reduce ? .opacity : .opacity.combined(with: .scale(scale: 0.98)) }
 
     /// The pill curve, in both dialects. `PanelWindow.applyPill` animates the window with
     /// `pillCA`; SwiftUI chrome tracks the same frame with `pillFrame`. One tuple, so they
@@ -205,6 +266,16 @@ func syncColor(_ status: SyncStatus) -> Color {
 
 // MARK: - Shared components
 
+/// Tactile press for custom buttons: squeeze to 0.96 while held, release on the same curve.
+/// `.plain` gives no pressed state at all, so chrome icons felt painted on.
+struct PressStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? Motion.pressScale : 1)
+            .animation(Motion.press, value: configuration.isPressed)
+    }
+}
+
 /// Every chrome control is this: one identical square container, one glyph size/weight,
 /// one hover background. Alignment then comes from the container geometry rather than
 /// from each SF Symbol's own optical center — which is why mixing a heavy glyph
@@ -216,6 +287,7 @@ struct ChromeIcon: View {
     var tint: Color? = nil // only the conflict badge deviates from the secondary chrome
     let action: () -> Void
     @State private var hovering = false
+    @Environment(\.theme) private var theme
 
     static let side: CGFloat = 28 // container; 2pt gaps → ~30pt pitch
 
@@ -228,11 +300,13 @@ struct ChromeIcon: View {
                             in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
                 .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        .foregroundStyle(tint ?? Color.secondary)
+        .buttonStyle(PressStyle())
+        // the theme's ink, not the system grey: ~3:1 on Sepia/Solarized paper otherwise
+        .foregroundStyle(tint ?? theme.secondaryInk)
         .onHover { hovering = $0 }
-        .animation(Motion.quick, value: hovering)
+        .animation(Motion.hover, value: hovering)
         .help(help)
+        .accessibilityLabel(help)
     }
 }
 
@@ -392,10 +466,11 @@ struct ThemeSwatch: View {
                     lineWidth: selected ? 2 : 1))
                 .contentShape(Circle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressStyle())
         .fixedSize()
         .animation(Motion.quick, value: selected)
         .help(theme.id)
+        .accessibilityLabel("\(theme.id) theme").accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 

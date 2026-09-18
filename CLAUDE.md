@@ -34,6 +34,7 @@ truth — [README.md](README.md) (vision/features), [PROJECT.md](PROJECT.md)
 | `PanelWindow.swift` | Floating borderless NSPanel + pill collapse/expand frames |
 | `NoteStore.swift` | `ObservableObject`: file listing, load/save, debounced autosave, folders, search index, pinning |
 | `GitSync.swift` | Every git op via `Process` on `/usr/bin/git` |
+| `GitHubSignIn.swift` | Optional "Sign in with GitHub": OAuth device flow over URLSession, token piped to `git credential approve`. Hidden while `GitHubAuth.clientID` is empty |
 | `EditorView.swift` | All SwiftUI: theme tokens, NavBar chrome, screens, NSTextView markdown editor |
 | `OnboardingView.swift` | First-run walkthrough + reusable git-setup guide |
 | `Vault.swift` | Optional encrypted vault: hdiutil sparse bundle mounted at the notes path, Keychain passphrase, erase-from-Mac |
