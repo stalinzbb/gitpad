@@ -5,6 +5,22 @@ All notable changes to GitPad. Dates are release dates; format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- **Sign in with GitHub.** The sync guide and Fix Sync can sign you in with a short code you
+  confirm on github.com (OAuth device flow — no GitPad server, no gh CLI, no SSH keys). The
+  login goes straight into git's own Keychain store; GitPad makes a private `gitpad-notes`
+  repo when it's allowed to. Hidden until the GitHub App's client ID ships in a build.
+- **Help** links in Settings: report a problem, how syncing works.
+
+### Changed
+
+- **Readable themes.** Sepia and Solarized Light's accent and code colours were ~3:1 on their
+  own paper; they're darker now and clear WCAG AA (4.5:1), and `--selftest` checks every
+  preset. Secondary text, and the green/red/orange status colours, are darker on light themes
+  for the same reason.
+- The empty Library says how to fix it (⌘N).
+
 ## [0.16.0] — 2026-09-17
 
 Notes that link to each other, GitPad at login, and floating editor cards that finally

@@ -72,7 +72,9 @@ enum GitSync {
         let s = stderr.lowercased()
         if s.contains("terminal prompts disabled") || s.contains("could not read username")
             || s.contains("authentication failed") {
-            return "This HTTPS URL needs a login — use the SSH URL (git@…), or install & sign in to the gh CLI"
+            return GitHubAuth.enabled
+                ? "This HTTPS URL needs a login — sign in with GitHub above, or use the SSH URL (git@…)"
+                : "This HTTPS URL needs a login — use the SSH URL (git@…), or install & sign in to the gh CLI"
         }
         if s.contains("permission denied") || s.contains("publickey") {
             return "SSH key not authorized — add this Mac's key to the repo host"

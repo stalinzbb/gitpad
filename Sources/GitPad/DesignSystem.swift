@@ -31,6 +31,27 @@ struct Theme: Identifiable {
     /// Selected row fill. Derived from the theme, NOT `Color.accentColor` — `.tint()` never
     /// changes accentColor, so a themed panel used to show system-blue selection.
     var selection: Color { accentSwift.opacity(Alpha.selection) }
+    /// Secondary/tertiary text levels, injected once in `EditorView`. nil tint = System.
+    var secondaryInk: Color { tintHex == nil ? Color(nsColor: .secondaryLabelColor) : Color.primary.opacity(0.62) }
+    var tertiaryInk: Color { tintHex == nil ? Color(nsColor: .tertiaryLabelColor) : Color.primary.opacity(0.5) }
+
+    /// WCAG contrast of accent and code against the surface, for `--selftest`: both are text
+    /// colours and must clear AA (4.5:1), so a new theme can't ship unreadable. nil = System.
+    var textContrast: (accent: Double, code: Double)? {
+        guard let tintHex, let surface = NSColor(hex: tintHex).usingColorSpace(.sRGB) else { return nil }
+        func lum(_ c: NSColor) -> Double {
+            let c = c.usingColorSpace(.sRGB) ?? c
+            let l = [c.redComponent, c.greenComponent, c.blueComponent].map(Double.init).map { (v: Double) -> Double in
+                v <= 0.03928 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4)
+            }
+            return 0.2126 * l[0] + 0.7152 * l[1] + 0.0722 * l[2] as Double
+        }
+        func ratio(_ a: NSColor) -> Double {
+            let (x, y) = (lum(a), lum(surface))
+            return (max(x, y) + 0.05) / (min(x, y) + 0.05)
+        }
+        return (ratio(accent), ratio(code))
+    }
 
     /// The common case: a preset from hex colors + a light/dark base.
     init(id: String, base: ThemeBase, accent: UInt, code: UInt, tint: UInt) {
@@ -45,10 +66,10 @@ struct Theme: Identifiable {
 
     static let all: [Theme] = [
         Theme(system: "System"),
-        Theme(id: "Sepia",            base: .light, accent: 0xA87538, code: 0x996B33, tint: 0xF5E8CF),
+        Theme(id: "Sepia",            base: .light, accent: 0x7D5729, code: 0x7A4A2B, tint: 0xF5E8CF),
         Theme(id: "Nord",             base: .dark,  accent: 0x87BFD1, code: 0xA3BF8C, tint: 0x2E3340),
         Theme(id: "Dracula",          base: .dark,  accent: 0xBD94FA, code: 0x4FE67A, tint: 0x292936),
-        Theme(id: "Solarized Light",  base: .light, accent: 0x268CD1, code: 0x859900, tint: 0xFCF5E3),
+        Theme(id: "Solarized Light",  base: .light, accent: 0x1D6BA0, code: 0x5E6C00, tint: 0xFCF5E3),
     ]
 
     static func named(_ id: String) -> Theme { all.first { $0.id == id } ?? all[0] }
@@ -129,9 +150,14 @@ extension Color {
     static let quietFill = Color.primary.opacity(Alpha.hover)   // search fields, steppers
     static let cardStroke = Color.primary.opacity(Alpha.stroke)
     // Status colors, so the sync dot / setup checks can't disagree across screens.
-    static let statusOK = Color.green
-    static let statusErr = Color.red
-    static let statusWarn = Color.orange
+    // Status colours double as text ("✓ Synced", the orange status line). System green/red/orange
+    // are ~2–3:1 on light paper, so light appearances get darker inks; dark keeps the system's.
+    static let statusOK = adaptive(light: 0x1E7B34, dark: .systemGreen)
+    static let statusErr = adaptive(light: 0xA8261C, dark: .systemRed)
+    static let statusWarn = adaptive(light: 0x8F5200, dark: .systemOrange)
+    private static func adaptive(light: UInt, dark: NSColor) -> Color {
+        Color(nsColor: NSColor(name: nil) { $0.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? dark : NSColor(hex: light) })
+    }
 }
 
 enum Fonts {

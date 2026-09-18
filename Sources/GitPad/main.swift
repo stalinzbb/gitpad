@@ -528,6 +528,13 @@ if CommandLine.arguments.contains("--selftest") {
     check(GitSync.deviceName == hostName, "blank override should fall back to the Mac's name")
     UserDefaults.standard.removeObject(forKey: "deviceName")
 
+    // Accessible themes: accent and code are text colours, AA (4.5:1) on the theme's surface.
+    for t in Theme.all {
+        guard let c = t.textContrast else { continue }
+        check(c.accent >= 4.5, "\(t.id) accent \(c.accent)")
+        check(c.code >= 4.5, "\(t.id) code \(c.code)")
+    }
+
     print("selftest OK")
     exit(0)
 }

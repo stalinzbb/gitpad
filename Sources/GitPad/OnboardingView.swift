@@ -103,6 +103,8 @@ struct GitSetupView: View {
     @State private var result: String?
     @State private var working = false
     @State private var ghReady = false
+    @State private var usedSignIn = false
+    @State private var needsInstall = false
 
     private var trimmed: String { remote.trimmingCharacters(in: .whitespacesAndNewlines) }
 
@@ -123,7 +125,18 @@ struct GitSetupView: View {
             }
 
             VStack(alignment: .leading, spacing: 18) {
-                if ghReady {
+                if GitHubAuth.enabled {
+                    // preferred over gh: a GitHub App token reaches only the repos GitPad was added to
+                    step(1, "Sign in with GitHub",
+                         "GitPad makes a private gitpad-notes repo and pushes over HTTPS. No SSH keys, no gh CLI, and the login goes straight into your Keychain.")
+                    GitHubSignInButton { signedIn($0) }
+                        .padding(.leading, Space.gutter + Space.l)
+                        .disabled(working)
+                    if needsInstall, let install = GitHubAuth.installURL {
+                        Link("Add GitPad to your notes repo ↗", destination: install)
+                            .font(.callout).padding(.leading, Space.gutter + Space.l)
+                    }
+                } else if ghReady {
                     step(1, "Create a private repo — one click",
                          "You're signed in to the gh CLI, so GitPad can make the repo and wire up auth for you. No SSH keys needed.")
                     Button { createRepo() } label: {
@@ -212,7 +225,8 @@ struct GitSetupView: View {
         result = nil
         DispatchQueue.global().async {
             GitSync.setRemote(url, in: store.dir)
-            if url.hasPrefix("https://") { GitSync.enableHTTPSAuth() } // let gh's token drive https pushes
+            // let gh's token drive https pushes — unless Sign in with GitHub just stored a narrower one
+            if url.hasPrefix("https://"), !usedSignIn { GitSync.enableHTTPSAuth() }
             let ls = GitSync.run(["ls-remote", url], in: store.dir)
             if ls.status != 0 {
                 let msg = GitSync.friendlyError(ls.out)
@@ -225,6 +239,23 @@ struct GitSetupView: View {
                 working = false
                 store.refresh()
                 if ok, let onboarding { onboarding() } // first run ends inside the editor
+            }
+        }
+    }
+
+    /// The token is already in git's credential store. Try the one-click repo; a GitHub App
+    /// limited to selected repos can't create one, so fall back to pasting the URL.
+    private func signedIn(_ token: String) {
+        usedSignIn = true
+        guard trimmed.isEmpty else { saveAndSync(); return } // they already pasted a repo: just use it
+        working = true
+        Task { @MainActor in
+            let url = await GitHubAuth.notesRepo(token: token)
+            working = false
+            if let url { remote = url; saveAndSync() }
+            else {
+                needsInstall = true
+                result = "✓ Signed in — now paste your repo's HTTPS URL below"
             }
         }
     }

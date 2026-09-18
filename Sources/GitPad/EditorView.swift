@@ -34,6 +34,10 @@ struct EditorView: View {
         }
         .animation(Motion.quick, value: store.lastDeleted?.original)
         .animation(Motion.quick, value: store.paletteOpen)
+        // Every `.secondary` / `.tertiary` below resolves against these levels. The system greys
+        // are tuned for white/black and fall to ~3:1 on Sepia and Solarized paper; 62% ink
+        // clears AA (4.5:1) on every preset, 50% clears 3:1 for marks. System keeps the OS's.
+        .foregroundStyle(.primary, theme.secondaryInk, theme.tertiaryInk)
         .tint(theme.accentSwift) // buttons/toggles/sliders/selection take the theme accent
         // The one reactive design value. `.tint` can't carry it: it never reaches
         // `Color.accentColor`, which is why themed panels used to select in system blue.
@@ -997,6 +1001,10 @@ struct SettingsView: View {
                     }
                     .font(.caption).foregroundStyle(.secondary)
                 }
+                Section("Help") {
+                    Link("Report a problem or suggest something ↗", destination: URL(string: "https://github.com/stalinzbb/GitPad/issues/new")!)
+                    Link("How syncing works ↗", destination: URL(string: "https://github.com/stalinzbb/GitPad/blob/main/SYNCING.md")!)
+                }
                 vaultSection
                 Section {
                     Button {
@@ -1217,6 +1225,8 @@ struct FixSyncPanel: View {
     @State private var ghReady = false
     @State private var note: String?
 
+    @State private var canSignIn = false
+
     private var headline: String {
         switch problem {
         case nil: return "Checking what went wrong…"
@@ -1234,7 +1244,8 @@ struct FixSyncPanel: View {
             + (ghReady ? " Switching to HTTPS pushes with your gh login's token, which can reach every repo on your account." : "")
         case .repoMissing: return "Check the URL."
         case .hostKeyChanged: return "That can be a man-in-the-middle attack — verify the new key with your host before trusting it."
-        case .httpsNeedsLogin: return "Sign in to the gh CLI (`gh auth login`) or use the SSH URL instead."
+        case .httpsNeedsLogin: return canSignIn ? "Sign in with GitHub and GitPad pushes over HTTPS — or use the SSH URL instead."
+            : "Sign in to the gh CLI (`gh auth login`) or use the SSH URL instead."
         case .offline: return "Network unreachable — GitPad retries every 5 minutes."
         default: return nil
         }
@@ -1276,6 +1287,9 @@ struct FixSyncPanel: View {
                         Link("Add key ↗", destination: URL(string: "https://github.com/settings/ssh/new")!)
                             .font(.caption)
                     }
+                case .httpsNeedsLogin where canSignIn:
+                    GitHubSignInButton { _ in store.requestSync?(); diagnose() }
+                    Button("Change repository…") { store.screen = .gitSetup }.buttonStyle(.bordered)
                 case .repoMissing, .httpsNeedsLogin:
                     Button("Change repository…") { store.screen = .gitSetup }.buttonStyle(.borderedProminent)
                 default:
@@ -1295,7 +1309,8 @@ struct FixSyncPanel: View {
         DispatchQueue.global().async {
             let p = GitSync.diagnose(dir: store.dir)
             let gh = GitSync.ghReady()
-            DispatchQueue.main.async { problem = p; ghReady = gh }
+            let hub = GitHubAuth.enabled && GitSync.remoteURL(in: store.dir).contains("github.com")
+            DispatchQueue.main.async { problem = p; ghReady = gh; canSignIn = hub }
         }
     }
 
@@ -1762,8 +1777,13 @@ struct LibraryView: View {
         VStack(spacing: 0) {
             if groups.isEmpty {
                 Spacer()
+                Image(systemName: searching ? "magnifyingglass" : "note.text")
+                    .font(.title2).foregroundStyle(.tertiary).padding(.bottom, Space.s)
                 Text(searching ? "No matches" : "No notes here yet")
                     .font(.callout).foregroundStyle(.secondary)
+                if !searching {
+                    Text("Press ⌘N to write one.").font(.caption).foregroundStyle(.secondary)
+                }
                 Spacer()
             } else {
                 List {
