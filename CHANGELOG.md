@@ -5,6 +5,13 @@ All notable changes to GitPad. Dates are release dates; format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- **Clipboard notes.** Turn on Settings → Advanced → *Save copied text to Clipboard notes* and,
+  while GitPad runs, text you copy in any app lands in today's note in a new **Clipboard**
+  section of the Library, under the time you copied it. It stays on this Mac — the folder
+  never syncs — and copies a password manager marks as secret are skipped. Text only.
+
 ## [0.17.0] — 2026-09-18
 
 Readable themes and chrome on every preset, tighter motion, and the groundwork for signing

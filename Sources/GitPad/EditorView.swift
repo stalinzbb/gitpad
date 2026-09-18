@@ -762,6 +762,7 @@ struct SettingsView: View {
     @AppStorage("fontDesign") private var fontDesign = "system"
     @AppStorage("editorFontSize") private var editorFontSize = 14.0
     @AppStorage("theme") private var themeID = "System"
+    @AppStorage(ClipboardWatcher.enabledKey) private var captureClipboard = false
     @AppStorage("autoCheckUpdates") private var autoCheckUpdates = true
     @AppStorage("autoUpdate") private var autoUpdate = false
     @AppStorage("vaultIdleMinutes") private var vaultIdleMinutes = 0
@@ -956,6 +957,14 @@ struct SettingsView: View {
                 ShortcutsList()
 
                 case .advanced:
+                Section {
+                    Toggle("Save copied text to Clipboard notes", isOn: $captureClipboard)
+                } header: {
+                    Text("Clipboard")
+                } footer: {
+                    Text("While GitPad runs, text you copy in any app is added to today's note in the Clipboard folder. It stays on this Mac — that folder never syncs. Copies your password manager marks as secret are skipped.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 Section {
                     Toggle("Open at login", isOn: Binding(get: { loginItem }, set: setLoginItem))
                         .disabled(Updater.isDevBuild) // a dev build registered at login would outlive its checkout
@@ -1528,12 +1537,13 @@ struct HotkeyRecorder: View {
 // MARK: - Library (two-column: sources on the left, notes on the right)
 
 enum LibrarySource: Hashable {
-    case recent, daily, inbox, folder(String)
+    case recent, daily, clipboard, inbox, folder(String)
 
     var label: String {
         switch self {
         case .recent: return "Recent"
         case .daily: return "Daily"
+        case .clipboard: return "Clipboard"
         case .inbox: return "Inbox"
         case .folder(let f): return f
         }
@@ -1542,6 +1552,7 @@ enum LibrarySource: Hashable {
         switch self {
         case .recent: return "clock"
         case .daily: return "calendar"
+        case .clipboard: return "doc.on.clipboard"
         case .inbox: return "tray"
         case .folder: return "folder"
         }
@@ -1561,8 +1572,8 @@ struct LibraryView: View {
     @FocusState private var searchFocused: Bool
     @FocusState private var folderFieldFocused: Bool
 
-    // user folders shown in the rail (Daily is its own top-level item)
-    private var folders: [String] { store.folders.filter { $0 != "Daily" } }
+    // user folders shown in the rail (Daily and Clipboard are their own top-level items)
+    private var folders: [String] { store.folders.filter { $0 != "Daily" && $0 != "Clipboard" } }
 
     private var searching: Bool { !query.trimmingCharacters(in: .whitespaces).isEmpty }
 
@@ -1570,6 +1581,7 @@ struct LibraryView: View {
         switch source {
         case .folder(let f): return "New note in \(f)"
         case .daily: return "Open today's daily note"
+        case .clipboard: return "Open today's clipboard note"
         default: return "New note in Inbox (⌘N)"
         }
     }
@@ -1579,6 +1591,7 @@ struct LibraryView: View {
     private func newNoteHere() {
         switch source {
         case .daily: store.open(store.dailyNote())
+        case .clipboard: store.open(store.clipboardNote())
         case .folder(let f): store.newNote(in: f)
         default: store.newNote()
         }
@@ -1591,6 +1604,7 @@ struct LibraryView: View {
             switch source {
             case .recent: return true
             case .daily: return store.folder(of: url) == "Daily"
+            case .clipboard: return store.folder(of: url) == "Clipboard"
             case .inbox: return store.folder(of: url) == nil
             case .folder(let f): return store.folder(of: url) == f
             }
@@ -1655,6 +1669,7 @@ struct LibraryView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     sourceRow(.recent)
                     sourceRow(.daily)
+                    if store.folders.contains("Clipboard") { sourceRow(.clipboard) } // only once something was captured
                     sourceRow(.inbox)
                     if !folders.isEmpty {
                         SectionLabel(text: "Folders") // matches the note-list section headers
@@ -1741,6 +1756,7 @@ struct LibraryView: View {
         switch s {
         case .recent: return store.notes.count
         case .daily: return store.notes.filter { store.folder(of: $0) == "Daily" }.count
+        case .clipboard: return store.notes.filter { store.folder(of: $0) == "Clipboard" }.count
         case .inbox: return store.notes.filter { store.folder(of: $0) == nil }.count
         case .folder(let f): return store.notes.filter { store.folder(of: $0) == f }.count
         }

@@ -20,6 +20,7 @@ subscription, no Electron.
 - **Smart editor** — live markdown styling, slash commands (`/` at the caret), auto-continuing lists and checkboxes, clickable to-dos, a select-text mini toolbar.
 - **Daily notes** — ⌥Space always lands on today's note; ⌘N for a fresh one.
 - **Library** — search-as-you-type, Pinned / Today / This Week / Earlier, folders. Pin notes and reveal any in Finder from the ⋯ menu.
+- **Clipboard notes (opt-in, local-only)** — while GitPad runs, text you copy in any app is logged to `Clipboard/<day>.md`. That folder is never committed or pushed; password-manager copies are skipped.
 - **Quick capture from anywhere else** — the `gitpad://` URL scheme (`new?text=`, `daily`, `daily?append=`, `note?title=`) drives GitPad from Raycast, Alfred, Shortcuts.app, or a shell script; "Append Clipboard to Daily" and your recent notes live in the status-bar menu.
 - **Invisible git sync** — commits, merges and pushes on every save, every 5 minutes, on wake, and when you open the panel. A second Mac pointed at the same repo adopts it cleanly instead of fighting it; genuine conflicts keep both versions and get their own review screen. See [SYNCING.md](SYNCING.md).
 - **Pill mode** — collapse the whole UI to a draggable 240×40 lozenge that floats over your work; ⌥Space springs it back.

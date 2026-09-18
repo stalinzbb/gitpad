@@ -576,6 +576,18 @@ if CommandLine.arguments.contains("--selftest") {
         check(c.code >= 4.5, "\(t.id) code \(c.code)")
     }
 
+    // clipboard capture filter: text passes; secrets, repeats, empties and non-text don't
+    let pb = NSPasteboard(name: NSPasteboard.Name("gitpad.selftest")) // never the user's real clipboard
+    defer { pb.releaseGlobally() }
+    pb.clearContents(); pb.setString("  hello\n", forType: .string)
+    check(ClipboardWatcher.capturable(pb, last: "") == "hello", "clipboard: plain text is captured, trimmed")
+    check(ClipboardWatcher.capturable(pb, last: "hello") == nil, "clipboard: a repeat is skipped")
+    pb.clearContents(); pb.setString("hunter2", forType: .string)
+    pb.setString("", forType: NSPasteboard.PasteboardType("org.nspasteboard.ConcealedType"))
+    check(ClipboardWatcher.capturable(pb, last: "") == nil, "clipboard: a concealed (password manager) copy is skipped")
+    pb.clearContents(); pb.setData(Data([1, 2, 3]), forType: .png)
+    check(ClipboardWatcher.capturable(pb, last: "") == nil, "clipboard: non-text is skipped")
+
     print("selftest OK")
     exit(0)
 }
