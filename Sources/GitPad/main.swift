@@ -258,6 +258,47 @@ if CommandLine.arguments.contains("--uitest") {
     (tv, coord) = makeEditor("[x](not a url)\n"); spin()
     check(tv.textStorage!.attribute(.link, at: 1, effectiveRange: nil) == nil, "junk target must not be clickable")
 
+    // Accessible chrome: render the real NavBar + text levels under the real themed root, per
+    // preset, and measure the strongest text pixel against the surface. Antialiasing only ever
+    // lowers a pixel's contrast, so the max is the ink's true rendered ratio.
+    MainActor.assumeIsolated { for t in Theme.all where t.appearance != nil {
+        let dark = t.appearance == .darkAqua
+        @MainActor func rendered(_ v: some View) -> Double {
+            let r = ImageRenderer(content: v.padding(6).background(t.surface).themed(t)
+                .environment(\.colorScheme, dark ? .dark : .light))
+            r.scale = 2
+            guard let cg = r.cgImage, let data = cg.dataProvider?.data, let px = CFDataGetBytePtr(data) else { return 0 }
+            func lum(_ o: Int) -> Double {
+                let c = (0..<3).map { i -> Double in
+                    let v = Double(px[o + i]) / 255
+                    return v <= 0.03928 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4)
+                }
+                return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+            }
+            let bpp = cg.bitsPerPixel / 8, bg = lum(0) // (0,0) is padding: pure surface
+            var best = 1.0
+            for y in 0..<cg.height { for x in 0..<cg.width {
+                let l = lum(y * cg.bytesPerRow + x * bpp)
+                best = max(best, (max(l, bg) + 0.05) / (min(l, bg) + 0.05))
+            } }
+            return best
+        }
+        let bar = rendered(NavBar(left: { ChromeIcon(symbol: ChromeGlyph.back, help: "Back") {} },
+                                  center: { VStack { Text("Groceries").font(.subheadline.weight(.semibold)); Text("Inbox").font(.caption2).foregroundStyle(.secondary) } },
+                                  right: { ChromeIcon(symbol: ChromeGlyph.close, help: "Close") {} }).frame(width: 300))
+        let second = rendered(Text("Saved · Synced 2:14 PM").font(.caption).foregroundStyle(.secondary))
+        let third = rendered(Image(systemName: "note.text").font(.title2).foregroundStyle(.tertiary))
+        let warn = rendered(Text("Can't reach remote").font(.caption).foregroundStyle(Color.statusWarn))
+        if let dir = ProcessInfo.processInfo.environment["GITPAD_UITEST_SNAPSHOT"] {
+            try? "\(t.id): navbar \(bar) secondary \(second) tertiary \(third) warn \(warn)\n"
+                .appendLine(to: URL(fileURLWithPath: dir).appendingPathComponent("contrast.txt"))
+        }
+        check(bar >= 4.5, "\(t.id) navbar ink \(bar)")
+        check(second >= 4.5, "\(t.id) secondary text \(second)")
+        check(third >= 3, "\(t.id) tertiary mark \(third)")
+        check(warn >= 4.5, "\(t.id) warning text \(warn)")
+    } }
+
     // GITPAD_UITEST_SNAPSHOT=<dir>: render a few editor states to PNG for eyeballing what
     // the preconditions can't check (placeholders, chips). Never set on CI.
     if let dir = ProcessInfo.processInfo.environment["GITPAD_UITEST_SNAPSHOT"] {
@@ -551,3 +592,10 @@ let delegate = AppDelegate()
 app.delegate = delegate
 app.setActivationPolicy(.accessory)
 app.run()
+
+private extension String {
+    func appendLine(to url: URL) throws {
+        let old = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+        try (old + self).write(to: url, atomically: true, encoding: .utf8)
+    }
+}

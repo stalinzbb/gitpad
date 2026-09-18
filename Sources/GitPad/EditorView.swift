@@ -28,20 +28,11 @@ struct EditorView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
             if !store.pill, store.paletteOpen, store.screen != .onboarding, !store.locked {
-                CommandPalette(store: store)
-                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                CommandPalette(store: store) // ⌘K, dozens of times a day: appears, never animates
             }
         }
         .animation(Motion.quick, value: store.lastDeleted?.original)
-        .animation(Motion.quick, value: store.paletteOpen)
-        // Every `.secondary` / `.tertiary` below resolves against these levels. The system greys
-        // are tuned for white/black and fall to ~3:1 on Sepia and Solarized paper; 62% ink
-        // clears AA (4.5:1) on every preset, 50% clears 3:1 for marks. System keeps the OS's.
-        .foregroundStyle(.primary, theme.secondaryInk, theme.tertiaryInk)
-        .tint(theme.accentSwift) // buttons/toggles/sliders/selection take the theme accent
-        // The one reactive design value. `.tint` can't carry it: it never reaches
-        // `Color.accentColor`, which is why themed panels used to select in system blue.
-        .environment(\.theme, theme)
+        .themed(theme)
         .overlay( // hairline edge; material below dims itself when the window loses key
             RoundedRectangle(cornerRadius: store.pill ? Radius.pill : Radius.panel, style: .continuous)
                 .strokeBorder(Color.primary.opacity(Alpha.strokeFaint), lineWidth: 1)
@@ -60,7 +51,7 @@ struct EditorView: View {
             // `screen = .capture` site. The vault has nothing to route.
             if store.locked {
                 LockedView(store: store)
-                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                    .transition(Motion.settle)
             } else {
             switch store.screen {
             case .onboarding:
@@ -68,23 +59,19 @@ struct EditorView: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.96)))
             case .capture:
                 CaptureView(store: store)
-                    .transition(.asymmetric(
-                        insertion: .move(edge: .leading).combined(with: .opacity),
-                        removal: .move(edge: .leading).combined(with: .opacity)))
+                    .transition(Motion.slide(.leading))
             case .library:
                 LibraryView(store: store)
-                    .transition(.asymmetric(
-                        insertion: .move(edge: .trailing).combined(with: .opacity),
-                        removal: .move(edge: .trailing).combined(with: .opacity)))
+                    .transition(Motion.slide(.trailing))
             case .settings:
                 SettingsView(store: store)
-                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                    .transition(Motion.settle)
             case .gitSetup:
                 GitSetupView(store: store)
-                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                    .transition(Motion.settle)
             case .conflicts:
                 ConflictView(store: store)
-                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                    .transition(Motion.settle)
             }
             }
         }
@@ -101,6 +88,7 @@ struct NavBar<L: View, C: View, R: View>: View {
     @ViewBuilder var left: () -> L
     @ViewBuilder var center: () -> C
     @ViewBuilder var right: () -> R
+    @Environment(\.theme) private var theme
 
     var body: some View {
         ZStack {
@@ -108,7 +96,9 @@ struct NavBar<L: View, C: View, R: View>: View {
             HStack { left(); Spacer(); right() }
         }
         .buttonStyle(.borderless)
-        .foregroundStyle(.secondary)
+        // three levels, not one: a bare `.secondary` here made the subtitle secondary-of-
+        // secondary. Title/icons take the theme's AA ink; nothing in the bar goes fainter.
+        .foregroundStyle(theme.secondaryInk, theme.secondaryInk, theme.tertiaryInk)
         // 8pt: the icon containers carry their own inset, so the glyphs still land
         // on the same optical margin as the body text.
         .padding(.horizontal, 8).padding(.top, 8).padding(.bottom, 6)
@@ -332,7 +322,7 @@ struct CommandPalette: View {
         .onHover { inside in
             if inside { hovered = i } else if hovered == i { hovered = nil }
         }
-        .animation(Motion.quick, value: hovered)
+        .animation(Motion.hover, value: hovered)
         .onTapGesture { run(item) }
         .id(i)
     }
@@ -398,7 +388,7 @@ struct ChromeBar<L: View>: View {
             HStack(spacing: 2) {
                 if !store.conflicts.isEmpty && store.screen != .conflicts {
                     ChromeIcon(symbol: ChromeGlyph.conflict, help: "Two Macs edited the same note — review",
-                               tint: .orange) { store.screen = .conflicts }
+                               tint: .statusWarn) { store.screen = .conflicts }
                 }
                 if showSettings {
                     ChromeIcon(symbol: ChromeGlyph.settings, help: "Settings (⌘,)") { store.openSettings() }
@@ -474,7 +464,7 @@ struct PillView: View {
                             in: RoundedRectangle(cornerRadius: Radius.chip, style: .continuous))
                 .contentShape(Rectangle())
                 .onHover { expandHover = $0 }
-                .animation(Motion.quick, value: expandHover)
+                .animation(Motion.hover, value: expandHover)
                 .highPriorityGesture(TapGesture().onEnded { store.setPill?(false) })
                 .help("Expand")
         }
@@ -544,7 +534,7 @@ struct CaptureView: View {
             HStack(spacing: Space.xxs) {
                 if !store.conflicts.isEmpty {
                     ChromeIcon(symbol: ChromeGlyph.conflict, help: "Two Macs edited the same note — review",
-                               tint: .orange) { store.screen = .conflicts }
+                               tint: .statusWarn) { store.screen = .conflicts }
                 }
                 ChromeIcon(symbol: ChromeGlyph.newNote, help: "New note (⌘N)") { store.newNote() }
                 ChromeIcon(symbol: "magnifyingglass", help: "Search notes (⌘K)") { store.searchNotes() }
@@ -1714,7 +1704,7 @@ struct LibraryView: View {
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 6).padding(.vertical, 6)
                 .onHover { newFolderHover = $0 }
-                .animation(Motion.quick, value: newFolderHover)
+                .animation(Motion.hover, value: newFolderHover)
             }
         }
         .frame(width: 150)
@@ -1855,7 +1845,7 @@ struct FolderRailRow: View {
         .rowBackground(selected: selected, hovering: hovering)
         .onTapGesture(perform: select)
         .onHover { hovering = $0 }
-        .animation(Motion.quick, value: hovering)
+        .animation(Motion.hover, value: hovering)
         .contextMenu {
             Button("Rename…", action: rename)
             Button("Delete Folder", role: .destructive, action: delete)
@@ -1917,7 +1907,7 @@ struct NoteRow: View {
         .rowBackground(hovering: hovering)
         .onTapGesture { store.open(url) }
         .onHover { hovering = $0 }
-        .animation(Motion.quick, value: hovering)
+        .animation(Motion.hover, value: hovering)
     }
 }
 

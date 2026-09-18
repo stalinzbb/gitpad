@@ -32,8 +32,11 @@ struct Theme: Identifiable {
     /// changes accentColor, so a themed panel used to show system-blue selection.
     var selection: Color { accentSwift.opacity(Alpha.selection) }
     /// Secondary/tertiary text levels, injected once in `EditorView`. nil tint = System.
-    var secondaryInk: Color { tintHex == nil ? Color(nsColor: .secondaryLabelColor) : Color.primary.opacity(0.62) }
-    var tertiaryInk: Color { tintHex == nil ? Color(nsColor: .tertiaryLabelColor) : Color.primary.opacity(0.5) }
+    /// Pure black/white ink, not `Color.primary`: macOS's label colour is already 85% alpha,
+    /// so "62% of primary" rendered at 4.2:1 on Sepia — measured by `--uitest`, which is why it exists.
+    var secondaryInk: Color { tintHex == nil ? Color(nsColor: .secondaryLabelColor) : ink.opacity(0.62) }
+    var tertiaryInk: Color { tintHex == nil ? Color(nsColor: .tertiaryLabelColor) : ink.opacity(0.5) }
+    private var ink: Color { appearance == .darkAqua ? .white : .black }
 
     /// WCAG contrast of accent and code against the surface, for `--selftest`: both are text
     /// colours and must clear AA (4.5:1), so a new theme can't ship unreadable. nil = System.
@@ -73,6 +76,20 @@ struct Theme: Identifiable {
     ]
 
     static func named(_ id: String) -> Theme { all.first { $0.id == id } ?? all[0] }
+}
+
+extension View {
+    /// The themed root: accent, the theme value, and the ink levels every `.secondary` /
+    /// `.tertiary` below resolves against. The system greys are tuned for white/black and
+    /// fall to ~3:1 on Sepia and Solarized paper; 62% ink clears AA (4.5:1) on every preset,
+    /// 50% clears 3:1 for marks. System keeps the OS's. `--uitest` measures the rendered result.
+    func themed(_ theme: Theme) -> some View {
+        foregroundStyle(.primary, theme.secondaryInk, theme.tertiaryInk)
+            .tint(theme.accentSwift) // buttons/toggles/sliders/selection take the theme accent
+            // `.tint` can't carry the theme: it never reaches `Color.accentColor`, which is
+            // why themed panels used to select in system blue.
+            .environment(\.theme, theme)
+    }
 }
 
 /// The one reactive design value. Injected once, in `EditorView`; everything below reads it
@@ -189,10 +206,28 @@ enum PanelMetrics {
 /// nil animation means "instant" — so Reduce Motion falls out for free everywhere.
 enum Motion {
     static var reduce: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
-    // screen: critically-damped reposition; quick: snappy hover; pop: momentum bounce.
-    static var screen: Animation? { reduce ? nil : .spring(response: 0.32, dampingFraction: 0.85) }
+    // screen: one screen replacing another — the house ease-out (same curve as the pill), under
+    //   300ms, no overshoot: it's seen tens of times a day. Reduce Motion keeps a short fade
+    //   (see `slide`), because a hard cut between screens reads as broken, not calm.
+    // quick: cards arriving/leaving. hover: colour only, ≤150ms. press: the 0.96 squeeze.
+    // pop: momentum bounce — onboarding only, where it's seen once.
+    static var screen: Animation? { reduce ? .easeOut(duration: 0.15) : houseEaseOut(0.24) }
     static var quick:  Animation? { reduce ? nil : .spring(response: 0.18, dampingFraction: 0.9) }
+    static var hover:  Animation? { reduce ? nil : .easeOut(duration: 0.12) }
+    static var press:  Animation? { reduce ? nil : .easeOut(duration: 0.16) }
     static var pop:    Animation? { reduce ? nil : .spring(response: 0.30, dampingFraction: 0.7) }
+    static let pressScale: CGFloat = 0.96
+
+    private static func houseEaseOut(_ d: TimeInterval) -> Animation {
+        .timingCurve(Double(pillCurve.0), Double(pillCurve.1), Double(pillCurve.2), Double(pillCurve.3), duration: d)
+    }
+
+    /// A screen sliding in from `edge`. Under Reduce Motion the movement goes, the fade stays.
+    static func slide(_ edge: Edge) -> AnyTransition {
+        reduce ? .opacity : .move(edge: edge).combined(with: .opacity)
+    }
+    /// A screen or card settling in place. Never from nothing: 0.98 + fade.
+    static var settle: AnyTransition { reduce ? .opacity : .opacity.combined(with: .scale(scale: 0.98)) }
 
     /// The pill curve, in both dialects. `PanelWindow.applyPill` animates the window with
     /// `pillCA`; SwiftUI chrome tracks the same frame with `pillFrame`. One tuple, so they
@@ -231,6 +266,16 @@ func syncColor(_ status: SyncStatus) -> Color {
 
 // MARK: - Shared components
 
+/// Tactile press for custom buttons: squeeze to 0.96 while held, release on the same curve.
+/// `.plain` gives no pressed state at all, so chrome icons felt painted on.
+struct PressStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? Motion.pressScale : 1)
+            .animation(Motion.press, value: configuration.isPressed)
+    }
+}
+
 /// Every chrome control is this: one identical square container, one glyph size/weight,
 /// one hover background. Alignment then comes from the container geometry rather than
 /// from each SF Symbol's own optical center — which is why mixing a heavy glyph
@@ -242,6 +287,7 @@ struct ChromeIcon: View {
     var tint: Color? = nil // only the conflict badge deviates from the secondary chrome
     let action: () -> Void
     @State private var hovering = false
+    @Environment(\.theme) private var theme
 
     static let side: CGFloat = 28 // container; 2pt gaps → ~30pt pitch
 
@@ -254,11 +300,13 @@ struct ChromeIcon: View {
                             in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
                 .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        .foregroundStyle(tint ?? Color.secondary)
+        .buttonStyle(PressStyle())
+        // the theme's ink, not the system grey: ~3:1 on Sepia/Solarized paper otherwise
+        .foregroundStyle(tint ?? theme.secondaryInk)
         .onHover { hovering = $0 }
-        .animation(Motion.quick, value: hovering)
+        .animation(Motion.hover, value: hovering)
         .help(help)
+        .accessibilityLabel(help)
     }
 }
 
@@ -418,10 +466,11 @@ struct ThemeSwatch: View {
                     lineWidth: selected ? 2 : 1))
                 .contentShape(Circle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressStyle())
         .fixedSize()
         .animation(Motion.quick, value: selected)
         .help(theme.id)
+        .accessibilityLabel("\(theme.id) theme").accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 
