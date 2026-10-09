@@ -763,6 +763,7 @@ struct SettingsView: View {
     @AppStorage("editorFontSize") private var editorFontSize = 14.0
     @AppStorage("theme") private var themeID = "System"
     @AppStorage(ClipboardWatcher.enabledKey) private var captureClipboard = false
+    @AppStorage(ClipboardWatcher.linksKey) private var captureLinks = false
     @AppStorage("autoCheckUpdates") private var autoCheckUpdates = true
     @AppStorage("autoUpdate") private var autoUpdate = false
     @AppStorage("vaultIdleMinutes") private var vaultIdleMinutes = 0
@@ -959,10 +960,11 @@ struct SettingsView: View {
                 case .advanced:
                 Section {
                     Toggle("Save copied text to Clipboard notes", isOn: $captureClipboard)
+                    Toggle("Save copied links to Links note", isOn: $captureLinks)
                 } header: {
                     Text("Clipboard")
                 } footer: {
-                    Text("While GitPad runs, text you copy in any app is added to today's note in the Clipboard folder. It stays on this Mac — that folder never syncs. Copies your password manager marks as secret are skipped.")
+                    Text("While GitPad runs, text you copy in any app is added to today's note in the Clipboard folder. It stays on this Mac — that folder never syncs. Copies your password manager marks as secret are skipped.\n\nCopied web links are collected in Links.md, which syncs like any note. Links that look like they carry a password, token or reset code are left out.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Section {

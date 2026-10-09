@@ -11,6 +11,9 @@ All notable changes to GitPad. Dates are release dates; format loosely follows
   while GitPad runs, text you copy in any app lands in today's note in a new **Clipboard**
   section of the Library, under the time you copied it. It stays on this Mac — the folder
   never syncs — and copies a password manager marks as secret are skipped. Text only.
+- **Links note.** Turn on Settings → Advanced → *Save copied links to Links note* and every web
+  link you copy is added once to `Links.md`, with when and from which app. It syncs like any
+  note, so links that look like they carry a password, token, signature or reset code are left out.
 
 ## [0.17.0] — 2026-09-18
 

@@ -449,6 +449,24 @@ final class NoteStore: ObservableObject {
                gap: "\n", sync: false) { clipboardNote() }
     }
 
+    /// Links.md at the notes root: every web link copied while "Save copied links" is on,
+    /// newest last, each once. Unlike Clipboard/ it syncs — ClipboardWatcher.savableLink
+    /// already refused anything that looks like it carries a credential.
+    func appendLink(_ link: String, from app: String?) {
+        let url = dir.appendingPathComponent("Links.md")
+        let existing = selected?.path == url.path ? text : (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+        guard !existing.contains("<\(link)>") else { return }
+        let stamp = DateFormatter()
+        stamp.dateFormat = "yyyy-MM-dd HH:mm"
+        let meta = [stamp.string(from: Date()), app].compactMap { $0 }.joined(separator: " · ")
+        append("- <\(link)> — \(meta)") {
+            if !FileManager.default.fileExists(atPath: url.path) {
+                try? "# Links\n\n".write(to: url, atomically: true, encoding: .utf8)
+            }
+            return url
+        }
+    }
+
     /// `note` is a closure so a locked vault never gets as far as creating the file.
     private func append(_ raw: String, gap: String = "", sync: Bool = true, to note: () -> URL) {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)

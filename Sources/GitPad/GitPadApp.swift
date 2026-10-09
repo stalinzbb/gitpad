@@ -108,6 +108,7 @@ enum Hotkey {
 /// `changeCount` — reading the count and the type list never touches the content.
 enum ClipboardWatcher {
     static let enabledKey = "captureClipboard"
+    static let linksKey = "captureLinks"
     private static var timer: Timer?
     private static var lastCount = NSPasteboard.general.changeCount
     private static var lastText = ""
@@ -127,6 +128,20 @@ enum ClipboardWatcher {
         return text
     }
 
+    /// A copy that is exactly one web link, safe to keep in the synced Links note — or nil.
+    /// Links carrying credentials (user:pass@, token/key/signature params, reset codes) are
+    /// refused: Links.md syncs, and git history is forever.
+    static func savableLink(_ text: String) -> String? {
+        guard !text.contains(where: \.isWhitespace), let c = URLComponents(string: text),
+              ["http", "https"].contains(c.scheme?.lowercased() ?? ""), c.host?.isEmpty == false,
+              c.user == nil, c.password == nil else { return nil }
+        // ponytail: substring match on query+fragment — "?passage=" is refused too. Missing a
+        // link beats syncing a token; tighten to exact param names if it refuses too much.
+        let tail = ((c.query ?? "") + "#" + (c.fragment ?? "")).lowercased()
+        let risky = ["token", "secret", "pass", "pwd", "auth", "key", "sig", "session", "code", "otp", "jwt"]
+        return risky.contains(where: tail.contains) ? nil : text
+    }
+
     static func start(_ onCopy: @escaping (String) -> Void) {
         let t = Timer(timeInterval: 1, repeats: true) { _ in
             let pb = NSPasteboard.general
@@ -134,7 +149,8 @@ enum ClipboardWatcher {
             lastCount = pb.changeCount
             // off, or a copy made inside GitPad (it's already a note): remember the count only,
             // so switching the setting on never logs what was copied before
-            guard UserDefaults.standard.bool(forKey: enabledKey), !NSApp.isActive,
+            let d = UserDefaults.standard
+            guard d.bool(forKey: enabledKey) || d.bool(forKey: linksKey), !NSApp.isActive,
                   let text = capturable(pb, last: lastText) else { return }
             lastText = text
             onCopy(text)
@@ -244,7 +260,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusItem.menu = menu
 
         Hotkey.start { [weak self] in self?.togglePanel() }
-        ClipboardWatcher.start { [weak self] in self?.store.appendToClipboard($0) }
+        ClipboardWatcher.start { [weak self] text in
+            guard let store = self?.store else { return }
+            let d = UserDefaults.standard
+            if d.bool(forKey: ClipboardWatcher.enabledKey) { store.appendToClipboard(text) }
+            if d.bool(forKey: ClipboardWatcher.linksKey), let link = ClipboardWatcher.savableLink(text) {
+                store.appendLink(link, from: NSWorkspace.shared.frontmostApplication?.localizedName)
+            }
+        }
 
         store.onSaved = { [weak self] in self?.backgroundSync() }
         store.onHide = { [weak self] in self?.panel.orderOut(nil) }

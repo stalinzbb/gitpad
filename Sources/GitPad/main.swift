@@ -588,6 +588,16 @@ if CommandLine.arguments.contains("--selftest") {
     pb.clearContents(); pb.setData(Data([1, 2, 3]), forType: .png)
     check(ClipboardWatcher.capturable(pb, last: "") == nil, "clipboard: non-text is skipped")
 
+
+    // link capture: plain web links pass; anything that could carry a credential doesn't
+    check(ClipboardWatcher.savableLink("https://example.com/a?q=swift#top") != nil, "links: a plain link is saved")
+    check(ClipboardWatcher.savableLink("see https://example.com") == nil, "links: prose with a link is not a link")
+    check(ClipboardWatcher.savableLink("ftp://example.com") == nil, "links: only http(s)")
+    check(ClipboardWatcher.savableLink("https://me:hunter2@example.com") == nil, "links: userinfo is refused")
+    check(ClipboardWatcher.savableLink("https://x.com/reset?token=abc") == nil, "links: a token param is refused")
+    check(ClipboardWatcher.savableLink("https://x.com/cb#access_token=abc") == nil, "links: a token fragment is refused")
+    check(ClipboardWatcher.savableLink("https://b.s3.amazonaws.com/f?X-Amz-Signature=abc") == nil, "links: a signed URL is refused")
+
     print("selftest OK")
     exit(0)
 }
