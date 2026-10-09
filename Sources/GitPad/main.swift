@@ -584,7 +584,23 @@ if CommandLine.arguments.contains("--selftest") {
     check(ClipboardWatcher.capturable(pb, last: "hello") == nil, "clipboard: a repeat is skipped")
     pb.clearContents(); pb.setString("hunter2", forType: .string)
     pb.setString("", forType: NSPasteboard.PasteboardType("org.nspasteboard.ConcealedType"))
-    check(ClipboardWatcher.capturable(pb, last: "") == nil, "clipboard: a concealed (password manager) copy is skipped")
+    check(ClipboardWatcher.capturable(pb, last: "") == ClipboardWatcher.redacted, "clipboard: a concealed copy is redacted")
+    check(ClipboardWatcher.capturable(pb, last: ClipboardWatcher.redacted) == nil, "clipboard: a repeat redaction is skipped")
+    pb.clearContents(); pb.setString("x", forType: .string)
+    pb.setString("", forType: NSPasteboard.PasteboardType("org.nspasteboard.TransientType"))
+    check(ClipboardWatcher.capturable(pb, last: "") == nil, "clipboard: a transient copy is dropped")
+    pb.clearContents(); pb.setString("plain words", forType: .string)
+    check(ClipboardWatcher.capturable(pb, last: "", app: "com.1password.1password") == ClipboardWatcher.redacted,
+          "clipboard: a copy from a password manager is redacted")
+    check(ClipboardWatcher.capturable(pb, last: "", app: "com.apple.Safari") == "plain words", "clipboard: other apps pass")
+    for s in ["ghp_" + String(repeating: "a", count: 36), "OPENAI_API_KEY=sk-proj-abcdefghijklmnopqrstuvwx",
+              "AKIAIOSFODNN7EXAMPLE", "xoxb-1234567890-abcdef", "-----BEGIN OPENSSH PRIVATE KEY-----",
+              "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0In0.abcdefghijklmnop"] {
+        check(ClipboardWatcher.isSecret(s), "clipboard: secret shape \(s.prefix(8))")
+    }
+    for s in ["hello world", "https://example.com/sk-learn", "ask-me-anything", "eyJust a word"] {
+        check(!ClipboardWatcher.isSecret(s), "clipboard: not a secret \(s)")
+    }
     pb.clearContents(); pb.setData(Data([1, 2, 3]), forType: .png)
     check(ClipboardWatcher.capturable(pb, last: "") == nil, "clipboard: non-text is skipped")
 

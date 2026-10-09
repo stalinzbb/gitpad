@@ -964,7 +964,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Clipboard")
                 } footer: {
-                    Text("While GitPad runs, text you copy in any app is added to today's note in the Clipboard folder. It stays on this Mac — that folder never syncs. Copies your password manager marks as secret are skipped.\n\nCopied web links are collected in Links.md, which syncs like any note. Links that look like they carry a password, token or reset code are left out.")
+                    Text("While GitPad runs, text you copy in any app is added to today's note in the Clipboard folder. It stays on this Mac — that folder never syncs. Copies from password managers, and anything that looks like an API key, token or private key, are logged as \"secret skipped\" instead.\n\nCopied web links are collected in Links.md, which syncs like any note. Links that look like they carry a password, token or reset code are left out.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Section {
